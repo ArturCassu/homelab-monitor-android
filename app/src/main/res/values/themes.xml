@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.HomelabMonitor" parent="android:style/Theme.Material.Light.NoActionBar" />
+</resources>

@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Homelab Monitor</string>
+    <string name="widget_status_name">Homelab · Status</string>
+    <string name="widget_resources_name">Homelab · CPU/RAM</string>
+    <string name="widget_storage_name">Homelab · Storage</string>
+    <string name="widget_sensors_name">Homelab · Sensors</string>
+    <string name="widget_containers_name">Homelab · Containers</string>
+    <string name="widget_immich_name">Homelab · Immich</string>
+    <string name="widget_summary_name">Homelab · Summary</string>
+</resources>
