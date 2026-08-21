@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
@@ -18,6 +20,7 @@ import androidx.glance.layout.width
 import androidx.glance.appwidget.updateAll
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.background
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -36,20 +39,33 @@ import com.example.homelabmonitor.data.repository.SnapshotStore
 private fun readSnapshot(context: Context): HomelabSnapshot =
     SnapshotStore(context).read() ?: MockSnapshotFactory.create()
 
-private fun titleStyle() = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold)
+@Composable
+private fun titleStyle() = TextStyle(
+    color = GlanceTheme.colors.onSurface,
+    fontSize = 16.sp,
+    fontWeight = FontWeight.Bold,
+)
 
-private fun valueStyle() = TextStyle(fontSize = 14.sp)
+@Composable
+private fun valueStyle() = TextStyle(
+    color = GlanceTheme.colors.onSurface,
+    fontSize = 14.sp,
+)
 
 @Composable
 private fun WidgetShell(title: String, content: @Composable () -> Unit) {
-    Column(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .padding(12.dp),
-    ) {
-        Text(title, style = titleStyle())
-        Spacer(GlanceModifier.height(6.dp))
-        content()
+    GlanceTheme {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .background(GlanceTheme.colors.widgetBackground)
+                .cornerRadius(20.dp)
+                .padding(12.dp),
+        ) {
+            Text(title, style = titleStyle())
+            Spacer(GlanceModifier.height(6.dp))
+            content()
+        }
     }
 }
 

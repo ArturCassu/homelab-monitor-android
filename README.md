@@ -58,6 +58,8 @@ O endpoint HTTP sem TLS é aceito no MVP para facilitar um agente limitado à in
 
 O `Application` agenda uma sincronização única periódica. Uma atualização bem-sucedida grava o snapshot e redesenha todos os widgets. Se a API falhar, o último snapshot permanece visível e a tela informa a falha da última coleta; o WorkManager agenda nova tentativa.
 
+Os widgets usam o fundo adaptativo do tema Glance, com cantos arredondados, e aceitam redimensionamento horizontal e vertical pelo launcher. Cada provider declara limites mínimos e máximos próprios para evitar que o conteúdo fique ilegível em tamanhos extremos.
+
 ## Segurança e limites
 
 - O token nunca é gravado em texto puro nas preferências e não é impresso em logs.
