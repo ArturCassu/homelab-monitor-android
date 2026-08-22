@@ -8,6 +8,7 @@ import com.example.homelabmonitor.data.model.healthState
 import com.example.homelabmonitor.data.model.ramUsagePercent
 import com.example.homelabmonitor.data.model.usagePercent
 import com.example.homelabmonitor.data.repository.HttpMonitorRepository
+import com.example.homelabmonitor.update.AppUpdateManifestParser
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -65,5 +66,24 @@ class MonitoringModelsTest {
     fun normalizesMetricsEndpointWithoutDuplicatingPath() {
         assertEquals("http://homelab:8099/v1/metrics", HttpMonitorRepository.metricsUrl("http://homelab:8099"))
         assertEquals("http://homelab:8099/v1/metrics", HttpMonitorRepository.metricsUrl("http://homelab:8099/v1/metrics/"))
+    }
+
+    @Test
+    fun parsesPublicUpdateManifest() {
+        val manifest = AppUpdateManifestParser.parse(
+            """
+            {
+              "version_code": 3,
+              "version_name": "0.2.0",
+              "apk_url": "https://github.com/ArturCassu/homelab-monitor-android/releases/download/v0.2.0/HomelabMonitor-debug.apk",
+              "sha256": "951ac02a466acf18fa4dcd6d091a164b015996cb3eaa5ada45103ec1af553fc4",
+              "notes": "teste"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(3L, manifest.versionCode)
+        assertEquals("0.2.0", manifest.versionName)
+        assertTrue(manifest.apkUrl.endsWith("HomelabMonitor-debug.apk"))
     }
 }

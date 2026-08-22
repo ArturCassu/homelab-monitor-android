@@ -44,13 +44,17 @@ import com.example.homelabmonitor.data.model.healthState
 import com.example.homelabmonitor.data.model.label
 import com.example.homelabmonitor.data.model.ramUsagePercent
 import com.example.homelabmonitor.data.model.usagePercent
+import com.example.homelabmonitor.update.AppUpdateState
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun DashboardScreen(
     state: MonitorUiState,
+    updateState: AppUpdateState,
     onRefresh: () -> Unit,
     onSaveSettings: (endpoint: String, token: String, useMockData: Boolean) -> Unit,
+    onCheckForUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -72,6 +76,7 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HeaderCard(state)
+            AppUpdateCard(updateState, onCheckForUpdate, onInstallUpdate)
             SummaryCard(state)
             CpuMemoryCard(state)
             StorageCard(state)
@@ -79,6 +84,64 @@ fun DashboardScreen(
             ContainersCard(state)
             ImmichCard(state)
             SettingsCard(state, onSaveSettings)
+        }
+    }
+}
+
+@Composable
+private fun AppUpdateCard(
+    state: AppUpdateState,
+    onCheckForUpdate: () -> Unit,
+    onInstallUpdate: () -> Unit,
+) {
+    MonitorCard {
+        CardTitle("Atualização do app")
+        Text(
+            "Versão instalada: ${state.currentVersionName} (${state.currentVersionCode})",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "O APK é baixado temporariamente no cache do app e removido depois; ele não fica acumulando em Downloads.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        state.available?.let { manifest ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Nova versão disponível: ${manifest.versionName} (${manifest.versionCode})",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            manifest.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                Text(notes, style = MaterialTheme.typography.bodySmall)
+            }
+            Button(
+                onClick = onInstallUpdate,
+                enabled = !state.isDownloading,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (state.isDownloading) "Baixando…" else "Baixar e instalar")
+            }
+        }
+        state.message?.let { message ->
+            Spacer(Modifier.height(6.dp))
+            Text(message, style = MaterialTheme.typography.bodySmall)
+        }
+        state.error?.let { error ->
+            Spacer(Modifier.height(6.dp))
+            Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+        if (state.isChecking) {
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        Spacer(Modifier.height(8.dp))
+        Button(
+            onClick = onCheckForUpdate,
+            enabled = !state.isChecking && !state.isDownloading,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(if (state.isChecking) "Verificando…" else "Verificar atualizações")
         }
     }
 }

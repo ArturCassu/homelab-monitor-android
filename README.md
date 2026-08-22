@@ -45,6 +45,12 @@ O app acrescenta `/v1/metrics` ao endpoint base, caso esse caminho ainda não es
 
 O endpoint HTTP sem TLS é aceito no MVP para facilitar um agente limitado à interface Tailscale. Nesse caso, a segurança do transporte depende do túnel Tailscale; para uso mais rigoroso, publique o agente somente via HTTPS. Nunca encaminhe a porta para a Internet.
 
+## Atualização pelo GitHub
+
+Como este repositório é público, o app tem a opção **Verificar atualizações** na tela principal. O app consulta `update/latest.json`, baixa a versão indicada para o cache privado, confere o SHA-256 e abre o instalador oficial do Android. O arquivo não é salvo em `Downloads`; o cache é limpo na próxima abertura do app e antes de cada novo download.
+
+O Android ainda exige a confirmação do usuário para instalar um APK fora da Play Store. Para publicar uma versão nova, gere o APK, publique-o na release correspondente e atualize `update/latest.json` com o `version_code`, `version_name`, URL pública do APK e SHA-256. O APK deve ser assinado com a mesma chave da versão instalada; os builds `debug` deste MVP só atualizam entre máquinas que usam a mesma chave debug.
+
 ## Arquitetura
 
 - `data/model/MonitoringModels.kt`: contrato de métricas, regras de estado e formatação.
@@ -54,6 +60,7 @@ O endpoint HTTP sem TLS é aceito no MVP para facilitar um agente limitado à in
 - `worker/MonitorWorker.kt`: atualização periódica via WorkManager, com rede conectada e intervalo mínimo do Android de 15 minutos.
 - `ui/`: dashboard Compose e configuração.
 - `widget/HomelabWidgets.kt`: sete `GlanceAppWidget` e receivers independentes; os widgets leem o cache e não fazem chamadas arbitrárias à rede.
+- `update/`: verificação, download temporário e preparação do APK de atualização pelo GitHub público.
 - `docs/metrics-agent.md`: especificação do pequeno agente a ser executado no homelab.
 
 O `Application` agenda uma sincronização única periódica. Uma atualização bem-sucedida grava o snapshot e redesenha todos os widgets. Se a API falhar, o último snapshot permanece visível e a tela informa a falha da última coleta; o WorkManager agenda nova tentativa.
@@ -75,3 +82,4 @@ Os widgets usam o fundo adaptativo do tema Glance, com cantos arredondados, e ac
 - JSON versionado (`schema_version`) com bytes absolutos para evitar ambiguidades de unidade.
 - Uma implementação sem Hilt para manter o projeto pequeno; `MonitorRepository` e `RepositoryFactory` permitem substituir o backend sem alterar a UI.
 - Timestamps em epoch milliseconds para parsing simples e consistente entre Debian e Android.
+- Distribuição inicial fora da Play Store para evitar custo de cadastro; o APK fica público, mas não contém credenciais do homelab.
