@@ -65,7 +65,9 @@ O Android ainda exige a confirmação do usuário para instalar um APK fora da P
 
 O `Application` agenda uma sincronização única periódica. Uma atualização bem-sucedida grava o snapshot e redesenha todos os widgets. Se a API falhar, o último snapshot permanece visível e a tela informa a falha da última coleta; o WorkManager agenda nova tentativa.
 
-Os widgets usam o fundo adaptativo do tema Glance, com cantos arredondados, e aceitam redimensionamento horizontal e vertical pelo launcher. Cada provider declara limites mínimos e máximos próprios para evitar que o conteúdo fique ilegível em tamanhos extremos.
+Os widgets usam o fundo adaptativo do tema Glance, com cantos arredondados, e aceitam redimensionamento horizontal e vertical pelo launcher. Cada provider usa `SizeMode.Exact` e lê `LocalSize`, escolhendo uma composição compacta, média ou expandida conforme o espaço real disponível. Cada provider também declara limites mínimos e máximos próprios para evitar que o conteúdo fique ilegível em tamanhos extremos.
+
+Na composição visual, Docker mostra a contagem e a lista de containers quando há espaço; CPU/RAM usam gráficos circulares; armazenamento usa barras de progresso por volume; sensores usam termômetros compactos; Status mostra online/offline e última sincronização; Geral concentra o resumo. O widget do Immich continua disponível como provider independente.
 
 ## Segurança e limites
 

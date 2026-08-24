@@ -1,7 +1,7 @@
 {
-  "version_code": 3,
-  "version_name": "0.2.0",
-  "apk_url": "https://github.com/ArturCassu/homelab-monitor-android/releases/download/v0.2.0/HomelabMonitor-debug.apk",
-  "sha256": "70a501391894ef02b4b9de933d1ff3c11499b795ca28ce6e9a6a527df6c621b2",
-  "notes": "Atualização pelo GitHub com download temporário no cache do app."
+  "version_code": 4,
+  "version_name": "0.3.0",
+  "apk_url": "https://github.com/ArturCassu/homelab-monitor-android/releases/download/v0.3.0/HomelabMonitor-debug.apk",
+  "sha256": "5153ee963e1a404e4c377f1c4c3f9b28657603611cbf4d4e2fd017a8d23652af",
+  "notes": "Widgets com layout adaptativo, gráficos de uso, barras de armazenamento e termômetros."
 }

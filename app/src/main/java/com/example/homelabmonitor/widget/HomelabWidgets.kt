@@ -1,14 +1,30 @@
 package com.example.homelabmonitor.widget
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.Image
+import androidx.glance.ImageProvider
+import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.LinearProgressIndicator
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.updateAll
+import androidx.glance.background
+import androidx.glance.layout.Alignment
+import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
@@ -16,16 +32,15 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.layout.width
-import androidx.glance.appwidget.updateAll
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.glance.background
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import com.example.homelabmonitor.data.model.ContainerItem
 import com.example.homelabmonitor.data.model.HomelabSnapshot
 import com.example.homelabmonitor.data.model.MockSnapshotFactory
+import com.example.homelabmonitor.data.model.SensorReading
 import com.example.homelabmonitor.data.model.formatBytes
 import com.example.homelabmonitor.data.model.formatDuration
 import com.example.homelabmonitor.data.model.formatObservedAt
@@ -39,53 +54,186 @@ import com.example.homelabmonitor.data.repository.SnapshotStore
 private fun readSnapshot(context: Context): HomelabSnapshot =
     SnapshotStore(context).read() ?: MockSnapshotFactory.create()
 
+private data class WidgetSize(val width: Dp, val height: Dp) {
+    val isCompact: Boolean
+        get() = width < 150.dp || height < 90.dp
+
+    val isExpanded: Boolean
+        get() = width >= 220.dp && height >= 150.dp
+}
+
 @Composable
-private fun titleStyle() = TextStyle(
+private fun currentWidgetSize(): WidgetSize = WidgetSize(
+    width = LocalSize.current.width,
+    height = LocalSize.current.height,
+)
+
+@Composable
+private fun titleStyle(compact: Boolean = false) = TextStyle(
     color = GlanceTheme.colors.onSurface,
-    fontSize = 16.sp,
+    fontSize = if (compact) 14.sp else 16.sp,
     fontWeight = FontWeight.Bold,
 )
 
 @Composable
-private fun valueStyle() = TextStyle(
+private fun valueStyle(compact: Boolean = false) = TextStyle(
     color = GlanceTheme.colors.onSurface,
-    fontSize = 14.sp,
+    fontSize = if (compact) 12.sp else 14.sp,
 )
 
 @Composable
-private fun WidgetShell(title: String, content: @Composable () -> Unit) {
+private fun captionStyle() = TextStyle(
+    color = GlanceTheme.colors.onSurfaceVariant,
+    fontSize = 11.sp,
+)
+
+@Composable
+private fun WidgetShell(title: String, content: @Composable (WidgetSize) -> Unit) {
     GlanceTheme {
+        val size = currentWidgetSize()
+        val padding = if (size.isCompact) 8.dp else 12.dp
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.widgetBackground)
-                .cornerRadius(20.dp)
-                .padding(12.dp),
+                .cornerRadius(if (size.isCompact) 16.dp else 20.dp)
+                .padding(padding),
         ) {
-            Text(title, style = titleStyle())
-            Spacer(GlanceModifier.height(6.dp))
-            content()
+            Text(title, style = titleStyle(size.isCompact))
+            Spacer(GlanceModifier.height(if (size.isCompact) 3.dp else 6.dp))
+            content(size)
         }
     }
 }
 
 @Composable
-private fun WidgetRow(label: String, value: String) {
+private fun WidgetRow(label: String, value: String, size: WidgetSize) {
     Row(GlanceModifier.fillMaxWidth()) {
-        Text(label, style = valueStyle())
+        Text(label, style = valueStyle(size.isCompact))
         Spacer(GlanceModifier.width(8.dp))
-        Text(value, style = valueStyle())
+        Text(value, style = valueStyle(size.isCompact))
     }
 }
 
+@Composable
+private fun StatusPill(online: Boolean, compact: Boolean) {
+    val background = if (online) GlanceTheme.colors.primaryContainer else GlanceTheme.colors.errorContainer
+    val foreground = if (online) GlanceTheme.colors.onPrimaryContainer else GlanceTheme.colors.onErrorContainer
+    Box(
+        modifier = GlanceModifier
+            .background(background)
+            .cornerRadius(12.dp)
+            .padding(if (compact) 5.dp else 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = if (online) "● ONLINE" else "● OFFLINE",
+            style = TextStyle(
+                color = foreground,
+                fontSize = if (compact) 12.sp else 14.sp,
+                fontWeight = FontWeight.Bold,
+            ),
+        )
+    }
+}
+
+private fun pieChartBitmap(context: Context, fraction: Float, accentColor: Int, sizeDp: Int): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val sizePx = (sizeDp * density).toInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val center = sizePx / 2f
+    val radius = center - (sizePx * 0.06f)
+    val bounds = RectF(center - radius, center - radius, center + radius, center + radius)
+
+    val track = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF536277.toInt()
+        style = Paint.Style.FILL
+    }
+    canvas.drawCircle(center, center, radius, track)
+
+    val used = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        style = Paint.Style.FILL
+    }
+    canvas.drawArc(bounds, -90f, 360f * fraction.coerceIn(0f, 1f), true, used)
+    return bitmap
+}
+
+@Composable
+private fun PieMetric(
+    label: String,
+    percent: Double,
+    chart: Bitmap,
+    compact: Boolean,
+) {
+    Box(
+        modifier = GlanceModifier.width(if (compact) 62.dp else 78.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column {
+            Image(
+                provider = ImageProvider(chart),
+                contentDescription = "$label ${formatPercent(percent)}",
+                modifier = GlanceModifier.size(if (compact) 42.dp else 56.dp),
+            )
+            Text(label, style = captionStyle())
+            Text(formatPercent(percent), style = valueStyle(compact))
+        }
+    }
+}
+
+@Composable
+private fun Thermometer(sensor: SensorReading, compact: Boolean) {
+    Box(
+        modifier = GlanceModifier.width(if (compact) 64.dp else 78.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column {
+            Text("🌡", style = TextStyle(fontSize = if (compact) 21.sp else 25.sp))
+            Text(
+                if (sensor.available && sensor.value != null) "${sensor.value} ${sensor.unit}" else "--",
+                style = valueStyle(compact),
+            )
+            Text(sensor.name, style = captionStyle())
+        }
+    }
+}
+
+@Composable
+private fun StorageBar(volumeName: String, usage: Float, compact: Boolean) {
+    Row(GlanceModifier.fillMaxWidth()) {
+        Text(volumeName, style = captionStyle())
+        Spacer(GlanceModifier.width(6.dp))
+        Text(formatPercent((usage * 100).toDouble()), style = valueStyle(compact))
+    }
+    LinearProgressIndicator(
+        progress = usage,
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .height(if (compact) 5.dp else 7.dp),
+        color = GlanceTheme.colors.primary,
+        backgroundColor = GlanceTheme.colors.surfaceVariant,
+    )
+    if (!compact) Spacer(GlanceModifier.height(3.dp))
+}
+
+@Composable
+private fun ContainerLine(item: ContainerItem, size: WidgetSize) {
+    val state = listOfNotNull(item.state, item.health).joinToString(" · ")
+    WidgetRow(item.name, state, size)
+}
+
 object StatusWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = readSnapshot(context)
         provideContent {
-            WidgetShell("Status geral") {
-                Text(if (snapshot.online) "ONLINE" else "OFFLINE", style = titleStyle())
-                WidgetRow("Uptime", formatDuration(snapshot.uptimeSeconds))
-                WidgetRow("Atualizado", formatObservedAt(snapshot.observedAtEpochMs))
+            WidgetShell("Status") { size ->
+                StatusPill(snapshot.online, size.isCompact)
+                WidgetRow("Sincronização", formatObservedAt(snapshot.observedAtEpochMs), size)
+                if (size.isExpanded) WidgetRow("Uptime", formatDuration(snapshot.uptimeSeconds), size)
             }
         }
     }
@@ -96,13 +244,25 @@ class StatusWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 object ResourcesWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = readSnapshot(context)
+        val cpuPercent = snapshot.cpu.usagePercent.coerceIn(0.0, 100.0)
+        val ramPercent = (snapshot.ramUsagePercent() * 100f).toDouble().coerceIn(0.0, 100.0)
+        val cpuChart = pieChartBitmap(context, (cpuPercent / 100.0).toFloat(), 0xFF62D6FF.toInt(), 56)
+        val ramChart = pieChartBitmap(context, (ramPercent / 100.0).toFloat(), 0xFFA899FF.toInt(), 56)
         provideContent {
-            WidgetShell("CPU e RAM") {
-                WidgetRow("CPU", formatPercent(snapshot.cpu.usagePercent))
-                WidgetRow("RAM", "${formatPercent((snapshot.ramUsagePercent() * 100).toDouble())} · ${formatBytes(snapshot.memory.usedBytes)}")
-                snapshot.cpu.load1m?.let { WidgetRow("Load 1m", "%.2f".format(it)) }
+            WidgetShell("CPU e RAM") { size ->
+                Row(GlanceModifier.fillMaxWidth()) {
+                    PieMetric("CPU", cpuPercent, cpuChart, size.isCompact)
+                    Spacer(GlanceModifier.width(if (size.isCompact) 2.dp else 8.dp))
+                    PieMetric("RAM", ramPercent, ramChart, size.isCompact)
+                }
+                if (size.isExpanded) {
+                    snapshot.cpu.load1m?.let { WidgetRow("Load 1m", "%.2f".format(it), size) }
+                    WidgetRow("RAM", formatBytes(snapshot.memory.usedBytes), size)
+                }
             }
         }
     }
@@ -113,14 +273,21 @@ class ResourcesWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 object StorageWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = readSnapshot(context)
         provideContent {
-            WidgetShell("Armazenamento") {
-                snapshot.volumes.take(3).forEach { volume ->
-                    WidgetRow(volume.name, "${formatPercent((volume.usagePercent() * 100).toDouble())} usado")
+            WidgetShell("Armazenamento") { size ->
+                val maxVolumes = when {
+                    size.isExpanded -> 5
+                    size.isCompact -> 2
+                    else -> 3
                 }
-                if (snapshot.volumes.isEmpty()) Text("Sem volumes")
+                snapshot.volumes.take(maxVolumes).forEach { volume ->
+                    StorageBar(volume.name, volume.usagePercent(), size.isCompact)
+                }
+                if (snapshot.volumes.isEmpty()) Text("Sem volumes", style = valueStyle(size.isCompact))
             }
         }
     }
@@ -131,14 +298,24 @@ class StorageWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 object SensorsWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = readSnapshot(context)
         provideContent {
-            WidgetShell("Sensores") {
-                snapshot.sensors.take(3).forEach { sensor ->
-                    WidgetRow(sensor.name, if (sensor.value == null) "--" else "${sensor.value} ${sensor.unit}")
+            WidgetShell("Sensores") { size ->
+                val maxSensors = when {
+                    size.isExpanded -> 4
+                    size.isCompact -> 2
+                    else -> 3
                 }
-                if (snapshot.sensors.isEmpty()) Text("Sem sensores")
+                Row(GlanceModifier.fillMaxWidth()) {
+                    snapshot.sensors.take(maxSensors).forEachIndexed { index, sensor ->
+                        if (index > 0) Spacer(GlanceModifier.width(if (size.isCompact) 2.dp else 6.dp))
+                        Thermometer(sensor, size.isCompact)
+                    }
+                }
+                if (snapshot.sensors.isEmpty()) Text("Sem sensores", style = valueStyle(size.isCompact))
             }
         }
     }
@@ -149,13 +326,22 @@ class SensorsWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 object ContainersWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = readSnapshot(context)
         provideContent {
-            WidgetShell("Docker") {
-                WidgetRow("Ativos", snapshot.containers.running.toString())
-                WidgetRow("Parados", snapshot.containers.stopped.toString())
-                WidgetRow("Erro", snapshot.containers.error.toString())
+            WidgetShell("Docker") { size ->
+                WidgetRow("Ativos", snapshot.containers.running.toString(), size)
+                WidgetRow("Parados", snapshot.containers.stopped.toString(), size)
+                WidgetRow("Erro", snapshot.containers.error.toString(), size)
+                if (!size.isCompact) {
+                    val maxItems = if (size.isExpanded) 5 else 2
+                    snapshot.containers.items.take(maxItems).forEach { ContainerLine(it, size) }
+                    if (snapshot.containers.items.isEmpty()) {
+                        Text("Sem detalhes dos containers", style = captionStyle())
+                    }
+                }
             }
         }
     }
@@ -166,13 +352,15 @@ class ContainersWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 object ImmichWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = readSnapshot(context)
         provideContent {
-            WidgetShell("Immich") {
-                WidgetRow("Servidor", snapshot.immich.server)
-                WidgetRow("Banco", snapshot.immich.database)
-                snapshot.immich.version?.let { WidgetRow("Versão", it) }
+            WidgetShell("Immich") { size ->
+                WidgetRow("Servidor", snapshot.immich.server, size)
+                WidgetRow("Banco", snapshot.immich.database, size)
+                if (size.isExpanded) snapshot.immich.version?.let { WidgetRow("Versão", it, size) }
             }
         }
     }
@@ -183,15 +371,22 @@ class ImmichWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 object SummaryWidget : GlanceAppWidget() {
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val snapshot = readSnapshot(context)
         provideContent {
-            WidgetShell("Resumo · ${snapshot.host}") {
-                WidgetRow("Estado", snapshot.healthState().label())
-                WidgetRow("CPU", formatPercent(snapshot.cpu.usagePercent))
-                WidgetRow("RAM", formatBytes(snapshot.memory.usedBytes))
-                WidgetRow("Docker", "${snapshot.containers.running} ativos")
-                WidgetRow("Immich", snapshot.immich.server)
+            WidgetShell("Geral") { size ->
+                WidgetRow("Estado", snapshot.healthState().label(), size)
+                WidgetRow("CPU", formatPercent(snapshot.cpu.usagePercent), size)
+                WidgetRow("RAM", formatBytes(snapshot.memory.usedBytes), size)
+                WidgetRow("Docker", "${snapshot.containers.running} ativos", size)
+                if (!size.isCompact) WidgetRow("Immich", snapshot.immich.server, size)
+                if (size.isExpanded) {
+                    WidgetRow("Host", snapshot.host, size)
+                    WidgetRow("Uptime", formatDuration(snapshot.uptimeSeconds), size)
+                    WidgetRow("Atualizado", formatObservedAt(snapshot.observedAtEpochMs), size)
+                }
             }
         }
     }
