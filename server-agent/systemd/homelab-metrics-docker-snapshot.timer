@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh homelab Docker metrics every 30 seconds
+
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=true
+Unit=homelab-metrics-docker-snapshot.service
+
+[Install]
+WantedBy=timers.target

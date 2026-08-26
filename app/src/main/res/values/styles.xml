@@ -1,0 +1,20 @@
+<resources>
+    <style name="WidgetPreviewTitle">
+        <item name="android:textColor">@color/widget_preview_text</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="WidgetPreviewValue">
+        <item name="android:textColor">@color/widget_preview_text</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="WidgetPreviewCaption">
+        <item name="android:textColor">@color/widget_preview_muted</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+</resources>

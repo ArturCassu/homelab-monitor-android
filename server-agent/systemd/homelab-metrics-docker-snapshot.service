@@ -1,0 +1,14 @@
+[Unit]
+Description=Refresh read-only Docker metrics snapshot
+Requires=homelab-metrics.service
+After=homelab-metrics.service docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/homelab-metrics-docker-snapshot
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+RestrictSUIDSGID=true
+ReadWritePaths=/run/homelab-metrics

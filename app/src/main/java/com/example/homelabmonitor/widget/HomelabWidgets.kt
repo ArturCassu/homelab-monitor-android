@@ -126,14 +126,23 @@ private fun StatusPill(online: Boolean, compact: Boolean) {
             .padding(if (compact) 5.dp else 7.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = if (online) "● ONLINE" else "● OFFLINE",
-            style = TextStyle(
-                color = foreground,
-                fontSize = if (compact) 12.sp else 14.sp,
-                fontWeight = FontWeight.Bold,
-            ),
-        )
+        Row {
+            Spacer(
+                GlanceModifier
+                    .size(if (compact) 7.dp else 8.dp)
+                    .background(foreground)
+                    .cornerRadius(8.dp),
+            )
+            Spacer(GlanceModifier.width(5.dp))
+            Text(
+                text = if (online) "ONLINE" else "OFFLINE",
+                style = TextStyle(
+                    color = foreground,
+                    fontSize = if (compact) 12.sp else 14.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+            )
+        }
     }
 }
 
@@ -157,6 +166,46 @@ private fun pieChartBitmap(context: Context, fraction: Float, accentColor: Int, 
         style = Paint.Style.FILL
     }
     canvas.drawArc(bounds, -90f, 360f * fraction.coerceIn(0f, 1f), true, used)
+    return bitmap
+}
+
+private fun thermometerBitmap(context: Context, accentColor: Int, sizeDp: Int): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val sizePx = (sizeDp * density).toInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val centerX = sizePx / 2f
+    val bulbRadius = sizePx * 0.18f
+    val tubeWidth = sizePx * 0.18f
+    val tubeTop = sizePx * 0.16f
+    val tubeBottom = sizePx * 0.72f
+    val tube = RectF(
+        centerX - tubeWidth / 2f,
+        tubeTop,
+        centerX + tubeWidth / 2f,
+        tubeBottom,
+    )
+
+    val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFB7C3D6.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = sizePx * 0.06f
+    }
+    canvas.drawRoundRect(tube, tubeWidth / 2f, tubeWidth / 2f, outline)
+    canvas.drawCircle(centerX, sizePx * 0.78f, bulbRadius + outline.strokeWidth / 2f, outline)
+
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        style = Paint.Style.FILL
+    }
+    val fillTube = RectF(
+        centerX - tubeWidth * 0.28f,
+        sizePx * 0.43f,
+        centerX + tubeWidth * 0.28f,
+        tubeBottom,
+    )
+    canvas.drawRoundRect(fillTube, tubeWidth * 0.28f, tubeWidth * 0.28f, fill)
+    canvas.drawCircle(centerX, sizePx * 0.78f, bulbRadius, fill)
     return bitmap
 }
 
@@ -184,15 +233,25 @@ private fun PieMetric(
 }
 
 @Composable
-private fun Thermometer(sensor: SensorReading, compact: Boolean) {
+private fun Thermometer(context: Context, sensor: SensorReading, compact: Boolean) {
+    val value = sensor.value
+    val accentColor = when {
+        !sensor.available || value == null -> 0xFF8291A8.toInt()
+        value >= 80.0 -> 0xFFFF8A80.toInt()
+        else -> 0xFF62D6FF.toInt()
+    }
     Box(
         modifier = GlanceModifier.width(if (compact) 64.dp else 78.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column {
-            Text("🌡", style = TextStyle(fontSize = if (compact) 21.sp else 25.sp))
+            Image(
+                provider = ImageProvider(thermometerBitmap(context, accentColor, if (compact) 26 else 32)),
+                contentDescription = "Sensor de temperatura",
+                modifier = GlanceModifier.size(if (compact) 26.dp else 32.dp),
+            )
             Text(
-                if (sensor.available && sensor.value != null) "${sensor.value} ${sensor.unit}" else "--",
+                if (sensor.available && value != null) "$value ${sensor.unit}" else "--",
                 style = valueStyle(compact),
             )
             Text(sensor.name, style = captionStyle())
@@ -312,7 +371,7 @@ object SensorsWidget : GlanceAppWidget() {
                 Row(GlanceModifier.fillMaxWidth()) {
                     snapshot.sensors.take(maxSensors).forEachIndexed { index, sensor ->
                         if (index > 0) Spacer(GlanceModifier.width(if (size.isCompact) 2.dp else 6.dp))
-                        Thermometer(sensor, size.isCompact)
+                        Thermometer(context, sensor, size.isCompact)
                     }
                 }
                 if (snapshot.sensors.isEmpty()) Text("Sem sensores", style = valueStyle(size.isCompact))
@@ -358,9 +417,13 @@ object ImmichWidget : GlanceAppWidget() {
         val snapshot = readSnapshot(context)
         provideContent {
             WidgetShell("Immich") { size ->
-                WidgetRow("Servidor", snapshot.immich.server, size)
-                WidgetRow("Banco", snapshot.immich.database, size)
-                if (size.isExpanded) snapshot.immich.version?.let { WidgetRow("Versão", it, size) }
+                if (!snapshot.immich.enabled) {
+                    Text("Desativado no agente", style = valueStyle(size.isCompact))
+                } else {
+                    WidgetRow("Servidor", snapshot.immich.server, size)
+                    WidgetRow("Banco", snapshot.immich.database, size)
+                    if (size.isExpanded) snapshot.immich.version?.let { WidgetRow("Versão", it, size) }
+                }
             }
         }
     }
@@ -381,7 +444,7 @@ object SummaryWidget : GlanceAppWidget() {
                 WidgetRow("CPU", formatPercent(snapshot.cpu.usagePercent), size)
                 WidgetRow("RAM", formatBytes(snapshot.memory.usedBytes), size)
                 WidgetRow("Docker", "${snapshot.containers.running} ativos", size)
-                if (!size.isCompact) WidgetRow("Immich", snapshot.immich.server, size)
+                if (!size.isCompact && snapshot.immich.enabled) WidgetRow("Immich", snapshot.immich.server, size)
                 if (size.isExpanded) {
                     WidgetRow("Host", snapshot.host, size)
                     WidgetRow("Uptime", formatDuration(snapshot.uptimeSeconds), size)

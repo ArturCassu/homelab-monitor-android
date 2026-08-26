@@ -1,0 +1,51 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/widget_preview_background">
+
+    <TextView
+        style="@style/WidgetPreviewTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Docker" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView style="@style/WidgetPreviewCaption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ativos" />
+            <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="11" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView style="@style/WidgetPreviewCaption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Parados" />
+            <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="2" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView style="@style/WidgetPreviewCaption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Erro" />
+            <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="1" android:textColor="@color/widget_preview_error" />
+        </LinearLayout>
+    </LinearLayout>
+    <TextView
+        style="@style/WidgetPreviewCaption"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="containers monitorados" />
+</LinearLayout>

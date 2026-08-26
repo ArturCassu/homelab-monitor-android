@@ -20,17 +20,22 @@ import javax.crypto.spec.GCMParameterSpec
 class SecureSettingsStore(context: Context) {
     private val preferences: SharedPreferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
 
-    fun load(): AppSettings = AppSettings(
-        endpoint = decrypt(preferences.getString(KEY_ENDPOINT, null)),
-        token = decrypt(preferences.getString(KEY_TOKEN, null)),
-        useMockData = preferences.getBoolean(KEY_USE_MOCK, true),
-    )
+    fun load(): AppSettings {
+        val endpoint = decrypt(preferences.getString(KEY_ENDPOINT, null))
+        return AppSettings(
+            endpoint = endpoint,
+            token = decrypt(preferences.getString(KEY_TOKEN, null)),
+            useMockData = preferences.getBoolean(KEY_USE_MOCK, true),
+            setupComplete = preferences.getBoolean(KEY_SETUP_COMPLETE, endpoint.isNotBlank()),
+        )
+    }
 
     fun save(settings: AppSettings) {
         preferences.edit()
             .putString(KEY_ENDPOINT, encrypt(settings.endpoint))
             .putString(KEY_TOKEN, encrypt(settings.token))
             .putBoolean(KEY_USE_MOCK, settings.useMockData)
+            .putBoolean(KEY_SETUP_COMPLETE, settings.setupComplete)
             .apply()
     }
 
@@ -84,6 +89,7 @@ class SecureSettingsStore(context: Context) {
         const val KEY_ENDPOINT = "endpoint_ciphertext"
         const val KEY_TOKEN = "token_ciphertext"
         const val KEY_USE_MOCK = "use_mock_data"
+        const val KEY_SETUP_COMPLETE = "setup_complete"
         const val KEY_ALIAS = "homelab_monitor_aes_v1"
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"

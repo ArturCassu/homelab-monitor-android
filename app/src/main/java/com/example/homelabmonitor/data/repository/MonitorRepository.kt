@@ -31,7 +31,7 @@ class HttpMonitorRepository(
 ) : MonitorRepository {
     override suspend fun fetchSnapshot(): Result<HomelabSnapshot> = withContext(Dispatchers.IO) {
         runCatching {
-            require(settings.endpoint.isNotBlank()) { "Configure o endpoint da API." }
+            require(settings.endpoint.isNotBlank()) { "Configure o host do homelab." }
             require(settings.token.isNotBlank()) { "Configure o token da API." }
 
             val request = Request.Builder()
@@ -43,7 +43,7 @@ class HttpMonitorRepository(
 
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    throw IOException("API respondeu HTTP ${response.code}")
+                    throw ApiResponseException(response.code)
                 }
                 val body = response.body?.string().orEmpty()
                 require(body.isNotBlank()) { "API retornou uma resposta vazia." }
@@ -65,8 +65,23 @@ class HttpMonitorRepository(
         }
 
         fun metricsUrl(endpoint: String): String {
-            val normalized = endpoint.trim().trimEnd('/')
-            return if (normalized.endsWith("/v1/metrics")) normalized else "$normalized/v1/metrics"
+            return "${EndpointConfig.normalize(endpoint)}/v1/metrics"
         }
     }
+}
+
+class ApiResponseException(val code: Int) : IOException("API respondeu HTTP $code")
+
+fun userFacingConnectionError(throwable: Throwable): String = when (throwable) {
+    is ApiResponseException -> when (throwable.code) {
+        401, 403 -> "Token recusado pelo agente. Confira o token e tente novamente."
+        404 -> "Agente encontrado, mas /v1/metrics não existe nesse endereço."
+        in 500..599 -> "O agente respondeu com erro ${throwable.code}. Verifique o homelab."
+        else -> "O agente respondeu HTTP ${throwable.code}."
+    }
+    is java.net.UnknownHostException -> "Não encontrei esse host. Confirme o Tailscale e o nome do servidor."
+    is java.net.ConnectException -> "Não consegui conectar. Verifique se o agente está ativo e se a porta está liberada no Tailscale."
+    is java.net.SocketTimeoutException -> "A conexão demorou demais. Confirme o Tailscale e tente novamente."
+    is IllegalArgumentException -> throwable.message ?: "Endereço do homelab inválido."
+    else -> throwable.message ?: "Não foi possível conectar ao homelab."
 }

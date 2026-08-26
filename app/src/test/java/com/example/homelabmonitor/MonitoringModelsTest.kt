@@ -8,6 +8,7 @@ import com.example.homelabmonitor.data.model.healthState
 import com.example.homelabmonitor.data.model.ramUsagePercent
 import com.example.homelabmonitor.data.model.usagePercent
 import com.example.homelabmonitor.data.repository.HttpMonitorRepository
+import com.example.homelabmonitor.data.repository.EndpointConfig
 import com.example.homelabmonitor.update.AppUpdateManifestParser
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -56,6 +57,16 @@ class MonitoringModelsTest {
     }
 
     @Test
+    fun disabledImmichDoesNotMakeHostUnhealthy() {
+        val snapshot = HomelabSnapshot(
+            online = true,
+            immich = com.example.homelabmonitor.data.model.ImmichStatus(enabled = false),
+        )
+
+        assertEquals(HealthState.HEALTHY, snapshot.healthState())
+    }
+
+    @Test
     fun formatsValuesForCompactCards() {
         assertEquals("1 KiB", formatBytes(1024))
         assertEquals("1.5 MiB", formatBytes(1_572_864))
@@ -66,6 +77,22 @@ class MonitoringModelsTest {
     fun normalizesMetricsEndpointWithoutDuplicatingPath() {
         assertEquals("http://homelab:8099/v1/metrics", HttpMonitorRepository.metricsUrl("http://homelab:8099"))
         assertEquals("http://homelab:8099/v1/metrics", HttpMonitorRepository.metricsUrl("http://homelab:8099/v1/metrics/"))
+        assertEquals("http://homelab:8099/v1/metrics", HttpMonitorRepository.metricsUrl("homelab"))
+        assertEquals("https://homelab:443/v1/metrics", HttpMonitorRepository.metricsUrl("https://homelab"))
+    }
+
+    @Test
+    fun validatesAndNormalizesHostsWithOptionalPort() {
+        val defaultPort = EndpointConfig.parse("100.64.10.20").getOrThrow()
+        assertEquals("http://100.64.10.20:8099", defaultPort.baseUrl)
+        assertTrue(defaultPort.usedDefaultPort)
+
+        val customPort = EndpointConfig.parse("http://homelab:9100/v1/metrics/").getOrThrow()
+        assertEquals("http://homelab:9100", customPort.baseUrl)
+        assertEquals(9100, customPort.port)
+
+        assertTrue(EndpointConfig.parse("http://bad host").isFailure)
+        assertTrue(EndpointConfig.parse("http://homelab:99999").isFailure)
     }
 
     @Test

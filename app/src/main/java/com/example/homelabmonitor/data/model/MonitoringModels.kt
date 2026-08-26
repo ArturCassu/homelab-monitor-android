@@ -67,6 +67,7 @@ data class ContainerItem(
 
 @Serializable
 data class ImmichStatus(
+    val enabled: Boolean = true,
     val server: String = "unknown",
     val database: String = "unknown",
     val version: String? = null,
@@ -76,13 +77,16 @@ data class AppSettings(
     val endpoint: String = "",
     val token: String = "",
     val useMockData: Boolean = true,
+    val setupComplete: Boolean = false,
 )
 
 data class MonitorUiState(
     val snapshot: HomelabSnapshot = MockSnapshotFactory.create(),
     val settings: AppSettings = AppSettings(),
     val isRefreshing: Boolean = false,
+    val isConnecting: Boolean = false,
     val lastError: String? = null,
+    val setupError: String? = null,
 )
 
 enum class HealthState {
@@ -95,8 +99,8 @@ enum class HealthState {
 fun HomelabSnapshot.healthState(fetchError: String? = null): HealthState {
     if (fetchError != null || !online) return HealthState.ERROR
     if (containers.error > 0) return HealthState.WARNING
-    if (immich.server.lowercase() !in setOf("healthy", "ok", "online")) return HealthState.WARNING
-    if (immich.database.lowercase() !in setOf("healthy", "ok", "online")) return HealthState.WARNING
+    if (immich.enabled && immich.server.lowercase() !in setOf("healthy", "ok", "online")) return HealthState.WARNING
+    if (immich.enabled && immich.database.lowercase() !in setOf("healthy", "ok", "online")) return HealthState.WARNING
     return HealthState.HEALTHY
 }
 
@@ -173,6 +177,6 @@ object MockSnapshotFactory {
             SensorReading("NVMe", 39.0),
         ),
         containers = ContainerStatus(running = 11, stopped = 2, error = 1),
-        immich = ImmichStatus(server = "healthy", database = "healthy", version = "v1.132.0"),
+        immich = ImmichStatus(enabled = true, server = "healthy", database = "healthy", version = "v1.132.0"),
     )
 }

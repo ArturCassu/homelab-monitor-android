@@ -1,0 +1,379 @@
+#!/bin/sh
+set -eu
+
+COMMAND=${1:-help}
+shift || true
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -f "$SCRIPT_DIR/install.sh" ]; then
+    PACKAGE_DIR=$SCRIPT_DIR
+elif [ -f /opt/homelab-metrics/package/install.sh ]; then
+    PACKAGE_DIR=/opt/homelab-metrics/package
+else
+    PACKAGE_DIR=$SCRIPT_DIR
+fi
+
+CONFIG_DIR=/etc/homelab-metrics
+ENV_FILE=$CONFIG_DIR/agent.env
+TOKEN_FILE=$CONFIG_DIR/token
+VOLUMES_FILE=$CONFIG_DIR/volumes.conf
+SERVICE=homelab-metrics.service
+SNAPSHOT_TIMER=homelab-metrics-docker-snapshot.timer
+
+root_exec() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
+configured() {
+    if [ -f "$ENV_FILE" ]; then
+        return 0
+    fi
+    command -v systemctl >/dev/null 2>&1 || return 1
+    systemctl cat "$SERVICE" >/dev/null 2>&1
+}
+
+active() {
+    command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE"
+}
+
+env_value() {
+    key=$1
+    if [ -r "$ENV_FILE" ]; then
+        sed -n "s/^${key}=//p" "$ENV_FILE" | head -n 1
+    else
+        printf '%s' ""
+    fi
+}
+
+valid_port() {
+    case "$1" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
+}
+
+print_help() {
+    cat <<'EOF'
+homelab-monitor — agente somente leitura do Homelab Monitor
+
+Uso:
+  homelab-monitor <comando>
+
+Comandos:
+  install       instala localmente ou em outra máquina via SSH
+  config        altera porta, volumes e serviços opcionais
+  status        mostra serviço, endpoint, Immich e resposta da API
+  doctor        diagnostica Tailscale, Docker, systemd e API
+  test          testa /v1/metrics sem revelar o token
+  token         mostra o token no terminal local, sob solicitação explícita
+  logs          acompanha os logs do agente
+  restart       reinicia o agente e o coletor Docker
+  uninstall     remove a instalação após confirmação
+  help          mostra esta ajuda
+
+Exemplos:
+  homelab-monitor install
+  homelab-monitor status
+  homelab-monitor config
+  homelab-monitor logs -f
+EOF
+}
+
+ask_port() {
+    current=${1:-8099}
+    while :; do
+        printf 'Porta da API [%s]: ' "$current"
+        read -r answer || answer=$current
+        answer=${answer:-$current}
+        if valid_port "$answer"; then
+            PORT=$answer
+            return
+        fi
+        echo "Porta inválida. Use um número entre 1 e 65535."
+    done
+}
+
+ask_immich() {
+    current=${1:-true}
+    if [ "$current" = true ]; then
+        prompt='S/n'
+        default=true
+    else
+        prompt='s/N'
+        default=false
+    fi
+    printf 'Monitorar serviços Immich? [%s]: ' "$prompt"
+    read -r answer || answer=
+    case "${answer:-}" in
+        s|S|sim|SIM|y|Y) IMMICH=true ;;
+        n|N|nao|não|NAO|NÃO) IMMICH=false ;;
+        *) IMMICH=$default ;;
+    esac
+}
+
+ask_install_options() {
+    current_port=$(env_value PORT)
+    current_port=${current_port:-8099}
+    current_immich=$(env_value ENABLE_IMMICH)
+    current_immich=${current_immich:-true}
+    ask_port "$current_port"
+    ask_immich "$current_immich"
+}
+
+install_local() {
+    if [ ! -f "$PACKAGE_DIR/install.sh" ]; then
+        echo "Pacote do agente não encontrado em $PACKAGE_DIR." >&2
+        exit 1
+    fi
+    root_exec sh "$PACKAGE_DIR/install.sh" --non-interactive --port "$PORT" --immich "$IMMICH"
+    echo
+    echo "Instalação concluída neste host. Rode 'homelab-monitor status' para conferir."
+}
+
+remote_install() {
+    target=${1:-}
+    if [ -z "$target" ]; then
+        printf 'Destino SSH (ex.: user@homelab): '
+        read -r target
+    fi
+    [ -n "$target" ] || { echo "Destino SSH não informado." >&2; return 1; }
+    printf 'Porta SSH [22]: '
+    read -r ssh_port || ssh_port=22
+    ssh_port=${ssh_port:-22}
+    if ! valid_port "$ssh_port"; then
+        echo "Porta SSH inválida." >&2
+        return 1
+    fi
+    if [ ! -f "$PACKAGE_DIR/install.sh" ]; then
+        echo "Pacote do agente não encontrado em $PACKAGE_DIR." >&2
+        return 1
+    fi
+
+    echo "Testando SSH para $target..."
+    if ! ssh -p "$ssh_port" -o ConnectTimeout=8 -- "$target" true; then
+        echo "Não consegui autenticar via SSH. Use uma chave/Tailscale SSH já autorizada; a CLI não coleta senhas." >&2
+        return 1
+    fi
+
+    remote_dir=$(ssh -p "$ssh_port" -- "$target" 'mktemp -d /tmp/homelab-monitor.XXXXXX')
+    case "$remote_dir" in
+        /tmp/homelab-monitor.[A-Za-z0-9]*) ;;
+        *) echo "O diretório temporário remoto não foi validado." >&2; return 1 ;;
+    esac
+    cleanup_remote() {
+        ssh -p "$ssh_port" -- "$target" "rm -rf '$remote_dir'" >/dev/null 2>&1 || true
+    }
+    trap cleanup_remote EXIT INT TERM
+
+    echo "Enviando o agente para $target..."
+    tar -C "$PACKAGE_DIR" -cf - . | ssh -p "$ssh_port" -- "$target" "tar -xf - -C '$remote_dir'"
+    echo "Executando a instalação no destino. O sudo, se necessário, será solicitado no terminal remoto."
+    ssh -t -p "$ssh_port" -- "$target" "cd '$remote_dir' && sudo sh ./install.sh --non-interactive --port '$PORT' --immich '$IMMICH'"
+    trap - EXIT INT TERM
+    cleanup_remote
+    echo
+    echo "Instalação remota concluída em $target."
+}
+
+install_command() {
+    if configured; then
+        echo "Este host já possui uma configuração do Homelab Monitor."
+        echo "Não vou sobrescrevê-la silenciosamente."
+        echo
+        echo "  1) Reconfigurar este host"
+        echo "  2) Instalar em outra máquina via SSH"
+        echo "  3) Cancelar"
+        printf 'Escolha [1-3]: '
+        read -r choice || choice=3
+        case "$choice" in
+            1) config_command; return ;;
+            2) ask_install_options; remote_install; return ;;
+            *) echo "Nada foi alterado."; return ;;
+        esac
+    fi
+
+    echo "Onde você quer instalar o agente?"
+    echo "  1) Nesta máquina"
+    echo "  2) Em outra máquina via SSH/Tailscale"
+    printf 'Escolha [1]: '
+    read -r location || location=1
+    location=${location:-1}
+    ask_install_options
+    case "$location" in
+        1) install_local ;;
+        2) remote_install ;;
+        *) echo "Escolha inválida." >&2; return 1 ;;
+    esac
+}
+
+status_command() {
+    echo "Homelab Monitor"
+    echo "────────────────────────────────────────"
+    if ! configured; then
+        echo "✗ Agente: não instalado neste host"
+        echo "  Sugestão: rode 'homelab-monitor install'."
+        echo "  Se o destino for outro servidor, escolha a opção SSH."
+        return 0
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+        state=$(systemctl is-active "$SERVICE" 2>/dev/null || true)
+        timer=$(systemctl is-active "$SNAPSHOT_TIMER" 2>/dev/null || true)
+    else
+        state=sem-systemd
+        timer=sem-systemd
+    fi
+    bind_ip=$(env_value BIND_IP)
+    port=$(env_value PORT); port=${port:-8099}
+    immich=$(env_value ENABLE_IMMICH); immich=${immich:-true}
+    if [ "$state" = active ]; then echo "✓ Agente: ativo"; else echo "✗ Agente: $state"; fi
+    if [ "$timer" = active ]; then echo "✓ Coletor Docker: ativo"; else echo "! Coletor Docker: $timer"; fi
+    echo "  Endpoint: http://${bind_ip:-<tailscale-ip>}:$port"
+    echo "  Immich: $([ "$immich" = true ] && echo habilitado || echo desabilitado)"
+    if [ "$state" = active ] && [ -r "$TOKEN_FILE" ] && command -v curl >/dev/null 2>&1; then
+        code=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
+            -H "Authorization: Bearer $(cat "$TOKEN_FILE")" -H 'Accept: application/json' \
+            "http://${bind_ip:-127.0.0.1}:$port/v1/metrics" || true)
+        if [ "$code" = 200 ]; then echo "✓ API: respondeu HTTP 200"; else echo "! API: respondeu HTTP ${code:-falha}"; fi
+    else
+        echo "! API: não testada (token sem leitura, curl ausente ou serviço parado)"
+    fi
+    echo
+    echo "Para instalar em outra máquina: homelab-monitor install → opção 2."
+}
+
+doctor_command() {
+    echo "Diagnóstico do Homelab Monitor"
+    echo "────────────────────────────────────────"
+    if command -v tailscale >/dev/null 2>&1; then
+        echo "✓ Tailscale: $(tailscale ip -4 2>/dev/null || echo 'sem IPv4')"
+    else
+        echo "✗ Tailscale: comando não encontrado"
+    fi
+    if command -v docker >/dev/null 2>&1; then
+        echo "✓ Docker: $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo 'não acessível')"
+    else
+        echo "! Docker: não encontrado (o monitor continuará sem containers)"
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+        status_command
+    else
+        echo "✗ systemd: não encontrado"
+    fi
+}
+
+config_command() {
+    if ! configured; then
+        echo "Este host ainda não está instalado. Rode 'homelab-monitor install'."
+        echo "Para outro host, escolha a instalação via SSH."
+        return 1
+    fi
+    current_port=$(env_value PORT); current_port=${current_port:-8099}
+    current_immich=$(env_value ENABLE_IMMICH); current_immich=${current_immich:-true}
+    current_bind=$(env_value BIND_IP)
+    ask_port "$current_port"
+    ask_immich "$current_immich"
+    current_volumes=$(if [ -r "$VOLUMES_FILE" ]; then paste -sd, "$VOLUMES_FILE"; fi)
+    printf 'Volumes separados por vírgula [%s]: ' "$current_volumes"
+    read -r volumes || volumes=$current_volumes
+    volumes=${volumes:-$current_volumes}
+    tmp_env=$(mktemp)
+    tmp_volumes=$(mktemp)
+    trap 'rm -f "$tmp_env" "$tmp_volumes"' EXIT INT TERM
+    printf 'BIND_IP=%s\nPORT=%s\nENABLE_IMMICH=%s\n' "$current_bind" "$PORT" "$IMMICH" > "$tmp_env"
+    printf '%s\n' "$volumes" | tr ',' '\n' | sed '/^[[:space:]]*$/d; s/^[[:space:]]*//; s/[[:space:]]*$//' > "$tmp_volumes"
+    root_exec install -o root -g root -m 0644 "$tmp_env" "$ENV_FILE"
+    root_exec install -o root -g root -m 0644 "$tmp_volumes" "$VOLUMES_FILE"
+    rm -f "$tmp_env" "$tmp_volumes"
+    trap - EXIT INT TERM
+    root_exec systemctl daemon-reload
+    root_exec systemctl restart "$SERVICE" "$SNAPSHOT_TIMER"
+    echo "Configuração atualizada."
+    status_command
+}
+
+test_command() {
+    if ! configured; then
+        echo "Agente não instalado neste host. Rode 'homelab-monitor install'." >&2
+        return 1
+    fi
+    bind_ip=$(env_value BIND_IP); port=$(env_value PORT); port=${port:-8099}
+    if [ ! -r "$TOKEN_FILE" ]; then
+        echo "Não consigo ler o token neste usuário. Rode 'homelab-monitor token' explicitamente." >&2
+        return 1
+    fi
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "curl não está instalado." >&2
+        return 1
+    fi
+    code=$(curl --silent --show-error --max-time 8 --output /tmp/homelab-monitor-test.json --write-out '%{http_code}' \
+        -H "Authorization: Bearer $(cat "$TOKEN_FILE")" -H 'Accept: application/json' \
+        "http://${bind_ip:-127.0.0.1}:$port/v1/metrics" || true)
+    echo "API: HTTP ${code:-falha}"
+    if [ "$code" = 200 ]; then
+        echo "Resposta válida recebida. O corpo foi salvo temporariamente em /tmp/homelab-monitor-test.json."
+        return 0
+    fi
+    echo "Consulte 'homelab-monitor logs' para detalhes do serviço." >&2
+    return 1
+}
+
+token_command() {
+    if [ ! -e "$TOKEN_FILE" ]; then
+        echo "Token não existe: o agente ainda não foi instalado neste host." >&2
+        return 1
+    fi
+    echo "Exibindo o token no terminal local; não o cole em chats ou repositórios."
+    root_exec cat "$TOKEN_FILE"
+    printf '\n'
+}
+
+logs_command() {
+    if [ "$#" -gt 0 ] && [ "$1" = "-f" ]; then
+        root_exec journalctl -u "$SERVICE" -f
+    else
+        root_exec journalctl -u "$SERVICE" -n 80 --no-pager
+    fi
+}
+
+restart_command() {
+    root_exec systemctl restart "$SERVICE" "$SNAPSHOT_TIMER"
+    echo "Agente reiniciado."
+    status_command
+}
+
+uninstall_command() {
+    if ! configured; then
+        echo "Nenhuma instalação encontrada neste host."
+        return 0
+    fi
+    printf 'Digite REMOVER para confirmar a desinstalação: '
+    read -r confirmation
+    if [ "$confirmation" != REMOVER ]; then
+        echo "Nada foi removido."
+        return 0
+    fi
+    root_exec systemctl disable --now "$SNAPSHOT_TIMER" "$SERVICE" 2>/dev/null || true
+    root_exec rm -f /etc/systemd/system/homelab-metrics.service /etc/systemd/system/homelab-metrics-docker-snapshot.service /etc/systemd/system/homelab-metrics-docker-snapshot.timer
+    root_exec rm -rf "$CONFIG_DIR" /opt/homelab-metrics /usr/local/libexec/homelab-metrics-docker-snapshot
+    root_exec systemctl daemon-reload
+    echo "Agente removido. O comando homelab-monitor foi mantido para permitir nova instalação."
+}
+
+case "$COMMAND" in
+    install) install_command "$@" ;;
+    config) config_command "$@" ;;
+    status) status_command "$@" ;;
+    doctor) doctor_command "$@" ;;
+    test) test_command "$@" ;;
+    token) token_command "$@" ;;
+    logs) logs_command "$@" ;;
+    restart) restart_command "$@" ;;
+    uninstall) uninstall_command "$@" ;;
+    help|-h|--help) print_help ;;
+    version|--version) echo "homelab-monitor 1.0" ;;
+    *) echo "Comando desconhecido: $COMMAND" >&2; print_help >&2; exit 2 ;;
+esac

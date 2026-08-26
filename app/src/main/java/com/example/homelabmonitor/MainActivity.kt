@@ -13,6 +13,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.homelabmonitor.ui.DashboardScreen
 import com.example.homelabmonitor.ui.MainViewModel
+import com.example.homelabmonitor.ui.SetupScreen
 import com.example.homelabmonitor.ui.theme.HomelabMonitorTheme
 
 class MainActivity : ComponentActivity() {
@@ -45,14 +46,26 @@ class MainActivity : ComponentActivity() {
                             viewModel.clearInstallerUri()
                         }
                     }
-                    DashboardScreen(
-                        state = state,
-                        updateState = updateState,
-                        onRefresh = viewModel::refresh,
-                        onSaveSettings = viewModel::saveSettings,
-                        onCheckForUpdate = viewModel::checkForAppUpdate,
-                        onInstallUpdate = viewModel::downloadAndPrepareUpdate,
-                    )
+                    if (!state.settings.setupComplete) {
+                        SetupScreen(
+                            initialEndpoint = state.settings.endpoint,
+                            initialToken = state.settings.token,
+                            isConnecting = state.isConnecting,
+                            error = state.setupError,
+                            onConnect = viewModel::connect,
+                            onDemo = viewModel::enterDemo,
+                        )
+                    } else {
+                        DashboardScreen(
+                            state = state,
+                            updateState = updateState,
+                            onRefresh = viewModel::refresh,
+                            onSaveSettings = viewModel::saveSettings,
+                            onChangeServer = viewModel::changeServer,
+                            onCheckForUpdate = viewModel::checkForAppUpdate,
+                            onInstallUpdate = viewModel::downloadAndPrepareUpdate,
+                        )
+                    }
                 }
             }
         }

@@ -1,0 +1,12 @@
+<resources>
+    <color name="widget_preview_background">#25344A</color>
+    <color name="widget_preview_border">#3D506B</color>
+    <color name="widget_preview_track">#536277</color>
+    <color name="widget_preview_primary">#62D6FF</color>
+    <color name="widget_preview_secondary">#A899FF</color>
+    <color name="widget_preview_success">#7CE5A1</color>
+    <color name="widget_preview_warning">#FFC66D</color>
+    <color name="widget_preview_error">#FF8A80</color>
+    <color name="widget_preview_text">#F5F7FB</color>
+    <color name="widget_preview_muted">#B7C3D6</color>
+</resources>

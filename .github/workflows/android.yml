@@ -25,10 +25,16 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug
+          ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: HomelabMonitor-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload unsigned release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomelabMonitor-release-unsigned
+          path: app/build/outputs/apk/release/app-release-unsigned.apk

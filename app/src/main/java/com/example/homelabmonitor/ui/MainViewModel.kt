@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.homelabmonitor.data.model.AppSettings
 import com.example.homelabmonitor.data.model.MockSnapshotFactory
 import com.example.homelabmonitor.data.model.MonitorUiState
+import com.example.homelabmonitor.data.repository.EndpointConfig
+import com.example.homelabmonitor.data.repository.userFacingConnectionError
 import com.example.homelabmonitor.data.repository.appContainer
 import com.example.homelabmonitor.update.AppUpdateRepository
 import com.example.homelabmonitor.update.AppUpdateState
@@ -31,7 +33,68 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         updateRepository.cleanupCache()
-        refresh()
+        if (_uiState.value.settings.setupComplete) refresh()
+    }
+
+    fun connect(endpointInput: String, tokenInput: String) {
+        val parsed = EndpointConfig.parse(endpointInput)
+        if (parsed.isFailure) {
+            _uiState.update { it.copy(setupError = parsed.exceptionOrNull()?.message ?: "Host inválido.") }
+            return
+        }
+        val token = tokenInput.trim()
+        if (token.isBlank()) {
+            _uiState.update { it.copy(setupError = "Informe o token emitido pelo agente do homelab.") }
+            return
+        }
+
+        val pendingSettings = AppSettings(
+            endpoint = parsed.getOrThrow().baseUrl,
+            token = token,
+            useMockData = false,
+            setupComplete = false,
+        )
+        _uiState.update { it.copy(isConnecting = true, setupError = null) }
+        viewModelScope.launch {
+            container.repositoryFactory.create(pendingSettings).fetchSnapshot()
+                .onSuccess { snapshot ->
+                    val savedSettings = pendingSettings.copy(setupComplete = true)
+                    container.settingsStore.save(savedSettings)
+                    container.snapshotStore.save(snapshot)
+                    _uiState.update {
+                        it.copy(
+                            settings = savedSettings,
+                            snapshot = snapshot,
+                            isConnecting = false,
+                            setupError = null,
+                            lastError = null,
+                        )
+                    }
+                    runCatching { HomelabWidgetUpdater.updateAll(getApplication()) }
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(isConnecting = false, setupError = userFacingConnectionError(throwable))
+                    }
+                }
+        }
+    }
+
+    fun enterDemo() {
+        val settings = AppSettings(useMockData = true, setupComplete = true)
+        val snapshot = MockSnapshotFactory.create()
+        container.settingsStore.save(settings)
+        container.snapshotStore.save(snapshot)
+        _uiState.update {
+            it.copy(settings = settings, snapshot = snapshot, setupError = null, lastError = null)
+        }
+        viewModelScope.launch { runCatching { HomelabWidgetUpdater.updateAll(getApplication()) } }
+    }
+
+    fun changeServer() {
+        val settings = _uiState.value.settings.copy(setupComplete = false)
+        container.settingsStore.save(settings)
+        _uiState.update { it.copy(settings = settings, setupError = null) }
     }
 
     fun refresh() {
@@ -49,7 +112,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update {
                     it.copy(
                         isRefreshing = false,
-                        lastError = throwable.message ?: "Não foi possível atualizar o homelab.",
+                        lastError = userFacingConnectionError(throwable),
                     )
                 }
             }
@@ -57,13 +120,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun saveSettings(endpoint: String, token: String, useMockData: Boolean) {
+        val normalizedEndpoint = if (useMockData && endpoint.isBlank()) {
+            ""
+        } else {
+            val parsed = EndpointConfig.parse(endpoint)
+            if (parsed.isFailure) {
+                _uiState.update {
+                    it.copy(lastError = parsed.exceptionOrNull()?.message ?: "Host inválido.")
+                }
+                return
+            }
+            parsed.getOrThrow().baseUrl
+        }
+        if (!useMockData && token.isBlank()) {
+            _uiState.update { it.copy(lastError = "Informe o token da API antes de desativar o modo demonstração.") }
+            return
+        }
         val settings = AppSettings(
-            endpoint = endpoint.trim(),
-            token = token,
+            endpoint = normalizedEndpoint,
+            token = token.trim(),
             useMockData = useMockData,
+            setupComplete = true,
         )
         container.settingsStore.save(settings)
-        _uiState.update { it.copy(settings = settings) }
+        _uiState.update { it.copy(settings = settings, lastError = null) }
         refresh()
     }
 

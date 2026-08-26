@@ -1,87 +1,160 @@
 # Homelab Monitor para Android
 
-MVP nativo em Kotlin para acompanhar o servidor Debian 13 `homelab` pela rede Tailscale. A tela principal usa Jetpack Compose e o projeto registra sete widgets Android Glance independentes:
+Aplicativo nativo em Kotlin para acompanhar um servidor Debian pela rede
+privada do Tailscale. O app usa Jetpack Compose na tela principal, Jetpack
+Glance nos widgets e WorkManager para sincronizações periódicas.
 
-1. Status geral: online/offline, uptime e última atualização.
-2. CPU e RAM.
-3. Armazenamento por volume.
-4. Temperatura e sensores disponíveis.
-5. Containers Docker: ativos, parados e com erro.
-6. Immich: servidor e banco de dados.
-7. Resumo geral.
+## O que existe no app
 
-O app não acessa Docker, não abre portas no servidor e não inclui credenciais reais. Quando o modo mock está ativado (padrão), a aplicação funciona sem o agente do homelab para permitir testar a UI e os widgets.
+- Onboarding que bloqueia a entrada real até um host válido responder à API.
+- Host aceito como `homelab`, `100.x.y.z`, `http://homelab` ou URL completa.
+- Porta opcional: `http://homelab` usa `8099` e `https://homelab` usa `443`;
+  uma porta explícita é preservada.
+- Modo demonstração separado, para conhecer a UI sem servidor.
+- Dashboard com estado dominante, sincronização rápida, métricas resumidas,
+  erros legíveis e configurações editáveis.
+- Sete widgets independentes e redimensionáveis: Status, CPU/RAM,
+  Armazenamento, Sensores, Containers, Immich e Geral.
+- Os widgets têm previews próprios no seletor do Android, com o mesmo estilo
+  visual dos cards; os indicadores são desenhados pelo app e não dependem de
+  emojis ou da fonte instalada no celular.
+- Immich opcional: quando o agente o desativa, ele deixa de aparecer no
+  resumo e no dashboard; o widget dedicado informa que está desativado.
 
-## Requisitos
+## Build e instalação do APK
 
-- Android Studio recente com JDK 17.
-- Android SDK Platform 35 e Build Tools compatíveis.
-- Um dispositivo/emulador Android API 26 ou superior.
-- Para dados reais: o app Tailscale conectado no Android e o agente de métricas acessível pelo endereço Tailscale do homelab.
-
-## Build e instalação
+Requisitos: Android Studio recente, JDK 17, Android SDK Platform 35 e um
+dispositivo Android API 26 ou superior.
 
 Na raiz do projeto:
 
 ```bash
 ./gradlew testDebugUnitTest
+./gradlew lintDebug
 ./gradlew assembleDebug
+./gradlew assembleRelease
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-No Windows, use `gradlew.bat` no lugar de `./gradlew`.
+No Windows, use `gradlew.bat`. O APK fica em
+`app/build/outputs/apk/debug/app-debug.apk`.
+O build de release local é gerado como
+`app/build/outputs/apk/release/app-release-unsigned.apk`; para os testes deste
+projeto, a release do GitHub usa o APK debug assinado pelo keystore de
+desenvolvimento, porque nenhum keystore de produção é versionado.
 
-O APK de debug é gerado em `app/build/outputs/apk/debug/app-debug.apk`. O projeto usa Gradle Version Catalog e o Gradle Wrapper; não é necessário instalar Gradle globalmente.
+## Primeiro acesso
 
-## Configuração no app
+1. Conecte o Tailscale no celular e no Debian.
+2. Abra o app e informe o host ou URL do agente.
+3. Se a porta for omitida, o app usa `8099` em HTTP ou `443` em HTTPS.
+4. Informe o token do agente e toque em **Testar e entrar**.
+5. O app só salva a configuração real depois de receber uma resposta válida
+   de `GET /v1/metrics`.
 
-1. Abra o app; o modo mock já vem selecionado.
-2. Para usar o agente, conecte o Android ao tailnet e informe o endpoint base, por exemplo `http://homelab:8099` ou `https://homelab.example.ts.net:8099`.
-3. Informe o token Bearer emitido especificamente para este app.
-4. Desmarque **Usar dados mockados (MVP)** e toque em **Salvar e atualizar**.
-5. Adicione à tela inicial os widgets individualmente pelo seletor de widgets do launcher. Cada item `Homelab · ...` corresponde a uma área independente.
+Exemplos aceitos:
 
-O app acrescenta `/v1/metrics` ao endpoint base, caso esse caminho ainda não esteja presente. A coleta manual e a coleta periódica usam a mesma camada de repositório.
+```text
+homelab
+http://homelab
+http://homelab:8099
+http://100.64.10.20:8099
+https://homelab.example.ts.net
+```
 
-O endpoint HTTP sem TLS é aceito no MVP para facilitar um agente limitado à interface Tailscale. Nesse caso, a segurança do transporte depende do túnel Tailscale; para uso mais rigoroso, publique o agente somente via HTTPS. Nunca encaminhe a porta para a Internet.
+O host e o token são cifrados com uma chave do Android Keystore. O token não
+vai para logs, GitHub ou widgets. Para trocar de servidor, use
+**Configurações → Trocar homelab**.
 
-## Atualização pelo GitHub
+## Instalar o agente no homelab
 
-Como este repositório é público, o app tem a opção **Verificar atualizações** na tela principal. O app consulta `update/latest.json`, baixa a versão indicada para o cache privado, confere o SHA-256 e abre o instalador oficial do Android. O arquivo não é salvo em `Downloads`; o cache é limpo na próxima abertura do app e antes de cada novo download.
+O agente é separado do app e roda como um serviço somente leitura. A forma
+mais simples, em uma máquina Linux com `curl` e `tar`, é:
 
-O Android ainda exige a confirmação do usuário para instalar um APK fora da Play Store. Para publicar uma versão nova, gere o APK, publique-o na release correspondente e atualize `update/latest.json` com o `version_code`, `version_name`, URL pública do APK e SHA-256. O APK deve ser assinado com a mesma chave da versão instalada; os builds `debug` deste MVP só atualizam entre máquinas que usam a mesma chave debug.
+```bash
+curl -fsSL https://raw.githubusercontent.com/ArturCassu/homelab-monitor-android/main/server-agent/bootstrap.sh | sh
+```
+
+O instalador pergunta se deve instalar:
+
+- nesta máquina; ou
+- em outra máquina via SSH/Tailscale, sem capturar senha.
+
+Também pergunta a porta da API e se o Immich deve ser monitorado. Se o host
+já tiver uma instalação, ele não sobrescreve nada silenciosamente: oferece
+reconfigurar a instalação atual ou iniciar uma instalação SSH em outra
+máquina.
+
+Após a instalação, o comando fica disponível:
+
+```bash
+homelab-monitor help
+homelab-monitor status
+homelab-monitor doctor
+homelab-monitor config
+homelab-monitor test
+homelab-monitor token
+homelab-monitor logs
+homelab-monitor restart
+```
+
+`homelab-monitor token` exibe o segredo somente no terminal local, mediante
+ação explícita. Não cole esse valor em chats, commits ou issues.
+
+O serviço HTTP escuta somente no IPv4 do Tailscale. O celular nunca acessa o
+Docker socket: um helper root fixo atualiza um snapshot de leitura dos
+containers a cada 30 segundos, enquanto a API roda como `homelab-metrics`.
+
+## Contrato da API
+
+```text
+GET /v1/metrics
+Authorization: Bearer <token>
+Accept: application/json
+```
+
+A resposta contém CPU, RAM, volumes configurados, sensores, containers e o
+estado opcional do Immich. O campo `immich.enabled` informa ao app se o
+recurso foi habilitado no servidor. Consulte
+`docs/metrics-agent.md` para o contrato completo e as decisões de segurança.
 
 ## Arquitetura
 
-- `data/model/MonitoringModels.kt`: contrato de métricas, regras de estado e formatação.
-- `data/repository/MonitorRepository.kt`: interface substituível, `MockMonitorRepository` e cliente HTTP somente leitura com OkHttp.
-- `data/repository/SecureSettingsStore.kt`: endpoint e token cifrados com AES/GCM; a chave é gerada e mantida no Android Keystore.
-- `data/repository/SnapshotStore.kt`: cache local do último snapshot, sem credenciais.
-- `worker/MonitorWorker.kt`: atualização periódica via WorkManager, com rede conectada e intervalo mínimo do Android de 15 minutos.
-- `ui/`: dashboard Compose e configuração.
-- `widget/HomelabWidgets.kt`: sete `GlanceAppWidget` e receivers independentes; os widgets leem o cache e não fazem chamadas arbitrárias à rede.
-- `update/`: verificação, download temporário e preparação do APK de atualização pelo GitHub público.
-- `docs/metrics-agent.md`: especificação do pequeno agente a ser executado no homelab.
-
-O `Application` agenda uma sincronização única periódica. Uma atualização bem-sucedida grava o snapshot e redesenha todos os widgets. Se a API falhar, o último snapshot permanece visível e a tela informa a falha da última coleta; o WorkManager agenda nova tentativa.
-
-Os widgets usam o fundo adaptativo do tema Glance, com cantos arredondados, e aceitam redimensionamento horizontal e vertical pelo launcher. Cada provider usa `SizeMode.Exact` e lê `LocalSize`, escolhendo uma composição compacta, média ou expandida conforme o espaço real disponível. Cada provider também declara limites mínimos e máximos próprios para evitar que o conteúdo fique ilegível em tamanhos extremos.
-
-Na composição visual, Docker mostra a contagem e a lista de containers quando há espaço; CPU/RAM usam gráficos circulares; armazenamento usa barras de progresso por volume; sensores usam termômetros compactos; Status mostra online/offline e última sincronização; Geral concentra o resumo. O widget do Immich continua disponível como provider independente.
+- `data/repository/EndpointConfig.kt`: validação e normalização de host,
+  esquema, caminho e porta padrão.
+- `data/repository/MonitorRepository.kt`: cliente HTTP e mensagens de erro
+  orientadas à ação.
+- `data/repository/SecureSettingsStore.kt`: endpoint/token cifrados no
+  Android Keystore.
+- `ui/OnboardingScreen.kt`: conexão inicial e modo demonstração.
+- `ui/DashboardScreen.kt`: dashboard Compose responsivo e editável.
+- `widget/HomelabWidgets.kt`: sete providers Glance independentes.
+- `worker/MonitorWorker.kt`: sincronização periódica respeitando o mínimo de
+  15 minutos do Android.
+- `server-agent/homelab-monitor`: CLI de instalação e manutenção.
+- `server-agent/homelab_metrics.py`: API Python sem dependências externas.
 
 ## Segurança e limites
 
-- O token nunca é gravado em texto puro nas preferências e não é impresso em logs.
-- O agente deve executar com usuário sem privilégios e consultar apenas APIs/sockets locais necessários; o celular recebe somente métricas agregadas.
-- O socket Docker (`/var/run/docker.sock`) não deve ser montado, exposto ou encaminhado ao Android.
-- O MVP não implementa rotação automática de token, certificado cliente, notificações ou histórico de séries temporais.
-- O Android pode atrasar atualizações periódicas por Doze, bateria e políticas do fabricante. A coleta manual serve para diagnóstico imediato.
-- A API real e o agente do servidor ainda dependem da implementação descrita na especificação. Até lá, o mock é a fonte funcional padrão.
+- O agente nunca expõe o Docker socket pela rede.
+- A porta é limitada à interface `tailscale0`; não há encaminhamento para a
+  Internet.
+- A API aceita somente `GET /v1/metrics` com Bearer token.
+- O token é gerado no servidor, fica fora do Git e não é impresso pelos
+  instaladores automaticamente.
+- O modo HTTP é aceitável apenas como MVP dentro do túnel Tailscale; HTTPS é
+  recomendado para um uso mais rigoroso.
+- O Android pode atrasar a atualização periódica por Doze, bateria e políticas
+  do fabricante. O botão de sincronização serve para diagnóstico imediato.
 
-## Decisões do MVP
+## Atualização do APK
 
-- Endpoint único `/v1/metrics` em vez de várias chamadas, reduzindo consumo e superfície de autenticação.
-- JSON versionado (`schema_version`) com bytes absolutos para evitar ambiguidades de unidade.
-- Uma implementação sem Hilt para manter o projeto pequeno; `MonitorRepository` e `RepositoryFactory` permitem substituir o backend sem alterar a UI.
-- Timestamps em epoch milliseconds para parsing simples e consistente entre Debian e Android.
-- Distribuição inicial fora da Play Store para evitar custo de cadastro; o APK fica público, mas não contém credenciais do homelab.
+O app consulta `update/latest.json`, baixa a versão nova para o cache privado,
+confere o SHA-256 e abre o instalador oficial do Android. O APK temporário não
+fica acumulado em `Downloads`; o Android ainda exige confirmação para instalar
+um APK fora da Play Store.
+
+As versões de teste são publicadas nas releases públicas do GitHub. A mesma
+assinatura de desenvolvimento precisa ser mantida para que o Android aceite a
+atualização sobre uma instalação anterior; uma instalação assinada por outro
+keystore deve ser removida antes da primeira troca de assinatura.

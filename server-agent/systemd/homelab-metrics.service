@@ -1,0 +1,33 @@
+[Unit]
+Description=Homelab read-only metrics API
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=homelab-metrics
+Group=homelab-metrics
+EnvironmentFile=/etc/homelab-metrics/agent.env
+ExecStart=/usr/bin/python3 /opt/homelab-metrics/homelab_metrics.py --bind ${BIND_IP} --port ${PORT} --token-file /etc/homelab-metrics/token --volumes-file /etc/homelab-metrics/volumes.conf --docker-snapshot /run/homelab-metrics/docker.tsv --immich-enabled ${ENABLE_IMMICH}
+Restart=on-failure
+RestartSec=5s
+RuntimeDirectory=homelab-metrics
+RuntimeDirectoryMode=0750
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+MemoryMax=256M
+CPUQuota=25%
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
