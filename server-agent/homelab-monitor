@@ -36,6 +36,13 @@ configured() {
     systemctl cat "$SERVICE" >/dev/null 2>&1
 }
 
+package_installed() {
+    [ -x /usr/local/bin/homelab-monitor ] \
+        && [ -f /opt/homelab-metrics/package/homelab-monitor ] \
+        && [ -f /opt/homelab-metrics/package/install.sh ] \
+        && [ -f /opt/homelab-metrics/homelab_metrics.py ]
+}
+
 active() {
     command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE"
 }
@@ -181,16 +188,25 @@ remote_install() {
 
 install_command() {
     if configured; then
-        echo "Este host já possui uma configuração do Homelab Monitor."
-        echo "Não vou sobrescrevê-la silenciosamente."
+        if package_installed; then
+            echo "Este host já possui uma instalação do Homelab Monitor."
+        else
+            echo "Encontrei uma instalação antiga ou incompleta neste host."
+            echo "O serviço pode estar ativo, mas a CLI/pacote ainda não foi instalado."
+        fi
+        echo "Nada será sobrescrito sem sua confirmação."
         echo
-        echo "  1) Reconfigurar este host"
+        echo "  1) Reparar/reconfigurar este host"
         echo "  2) Instalar em outra máquina via SSH"
         echo "  3) Cancelar"
         printf 'Escolha [1-3]: '
         read -r choice || choice=3
         case "$choice" in
-            1) config_command; return ;;
+            1)
+                ask_install_options
+                install_local
+                return
+                ;;
             2) ask_install_options; remote_install; return ;;
             *) echo "Nada foi alterado."; return ;;
         esac
@@ -358,9 +374,10 @@ uninstall_command() {
     fi
     root_exec systemctl disable --now "$SNAPSHOT_TIMER" "$SERVICE" 2>/dev/null || true
     root_exec rm -f /etc/systemd/system/homelab-metrics.service /etc/systemd/system/homelab-metrics-docker-snapshot.service /etc/systemd/system/homelab-metrics-docker-snapshot.timer
-    root_exec rm -rf "$CONFIG_DIR" /opt/homelab-metrics /usr/local/libexec/homelab-metrics-docker-snapshot
+    root_exec rm -rf "$CONFIG_DIR" /opt/homelab-metrics /usr/local/libexec/homelab-metrics-docker-snapshot /usr/local/bin/homelab-monitor
     root_exec systemctl daemon-reload
-    echo "Agente removido. O comando homelab-monitor foi mantido para permitir nova instalação."
+    echo "Agente removido. Para instalar novamente, rode o bootstrap do GitHub."
+    echo "  curl -fsSL https://raw.githubusercontent.com/ArturCassu/homelab-monitor-android/main/server-agent/bootstrap.sh | sh"
 }
 
 case "$COMMAND" in

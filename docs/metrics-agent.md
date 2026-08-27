@@ -18,11 +18,12 @@ homelab-monitor logs
 homelab-monitor restart
 ```
 
-O primeiro `install` é interativo. Ele oferece instalação local ou via SSH,
-pergunta porta e pergunta se o Immich deve ser habilitado. Se já detectar
+O `install` é interativo. Ele oferece instalação local ou via SSH, pergunta a
+porta e pergunta se o Immich deve ser habilitado. Se já detectar
 `homelab-metrics.service` ou a configuração em `/etc/homelab-metrics`, ele
-mostra o estado atual e oferece reconfigurar este host ou instalar em outro
-destino SSH.
+oferece reparar/reconfigurar este host ou instalar em outro destino SSH. A
+reparação reinstala a CLI, o pacote e o serviço sem gerar um novo token quando
+o token atual já existe.
 
 O bootstrap público é:
 
