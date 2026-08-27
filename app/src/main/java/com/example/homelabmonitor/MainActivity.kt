@@ -21,14 +21,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            HomelabMonitorTheme {
+            val viewModel: MainViewModel = viewModel()
+            val state = viewModel.uiState.collectAsStateWithLifecycle().value
+            val updateState = viewModel.updateState.collectAsStateWithLifecycle().value
+            HomelabMonitorTheme(accentTheme = state.settings.accentTheme) {
                 Surface(
                     modifier = androidx.compose.ui.Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val viewModel: MainViewModel = viewModel()
-                    val state = viewModel.uiState.collectAsStateWithLifecycle().value
-                    val updateState = viewModel.updateState.collectAsStateWithLifecycle().value
                     LaunchedEffect(updateState.installerUri) {
                         updateState.installerUri?.let { uri ->
                             runCatching {
@@ -53,7 +53,6 @@ class MainActivity : ComponentActivity() {
                             isConnecting = state.isConnecting,
                             error = state.setupError,
                             onConnect = viewModel::connect,
-                            onDemo = viewModel::enterDemo,
                         )
                     } else {
                         DashboardScreen(
@@ -61,6 +60,7 @@ class MainActivity : ComponentActivity() {
                             updateState = updateState,
                             onRefresh = viewModel::refresh,
                             onSaveSettings = viewModel::saveSettings,
+                            onAccentThemeChange = viewModel::setAccentTheme,
                             onChangeServer = viewModel::changeServer,
                             onCheckForUpdate = viewModel::checkForAppUpdate,
                             onInstallUpdate = viewModel::downloadAndPrepareUpdate,

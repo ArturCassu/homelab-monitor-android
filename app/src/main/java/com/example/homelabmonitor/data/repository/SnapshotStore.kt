@@ -9,13 +9,19 @@ class SnapshotStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
 
     fun read(): HomelabSnapshot? = preferences.getString(KEY_SNAPSHOT, null)?.let { encoded ->
-        runCatching { snapshotJson.decodeFromString<HomelabSnapshot>(encoded) }.getOrNull()
+        runCatching { snapshotJson.decodeFromString<HomelabSnapshot>(encoded) }
+            .getOrNull()
+            ?.takeUnless { it.host.contains("(mock)", ignoreCase = true) }
     }
 
     fun save(snapshot: HomelabSnapshot) {
         preferences.edit()
             .putString(KEY_SNAPSHOT, snapshotJson.encodeToString<HomelabSnapshot>(snapshot))
             .apply()
+    }
+
+    fun clear() {
+        preferences.edit().remove(KEY_SNAPSHOT).apply()
     }
 
     private companion object {

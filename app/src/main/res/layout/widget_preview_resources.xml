@@ -1,79 +1,69 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
+    android:orientation="horizontal"
+    android:gravity="center"
+    android:baselineAligned="false"
+    android:padding="12dp"
     android:background="@drawable/widget_preview_background">
 
-    <TextView
-        style="@style/WidgetPreviewTitle"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="CPU e RAM" />
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+        <FrameLayout
+            android:layout_width="68dp"
+            android:layout_height="68dp">
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="CPU"
+                android:src="@drawable/widget_preview_cpu_ring" />
+            <TextView
+                style="@style/WidgetPreviewValue"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="18%"
+                android:textStyle="bold" />
+        </FrameLayout>
+        <TextView
+            style="@style/WidgetPreviewCaption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:text="CPU" />
+    </LinearLayout>
 
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginTop="12dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView
-                style="@style/WidgetPreviewCaption"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="CPU" />
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+        <FrameLayout
+            android:layout_width="68dp"
+            android:layout_height="68dp">
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="RAM"
+                android:src="@drawable/widget_preview_ram_ring" />
             <TextView
                 style="@style/WidgetPreviewValue"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="18%" />
-            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="7dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/widget_preview_track">
-                <View
-                    android:layout_width="35dp"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/widget_preview_primary" />
-            </FrameLayout>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="33%"
+                android:textStyle="bold" />
+        </FrameLayout>
+        <TextView
+            style="@style/WidgetPreviewCaption"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="12dp"
-            android:orientation="vertical">
-            <TextView
-                style="@style/WidgetPreviewCaption"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="RAM" />
-            <TextView
-                style="@style/WidgetPreviewValue"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="33%" />
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="7dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/widget_preview_track">
-                <View
-                    android:layout_width="62dp"
-                    android:layout_height="match_parent"
-                    android:background="@drawable/widget_preview_secondary" />
-            </FrameLayout>
-        </LinearLayout>
+            android:layout_marginTop="5dp"
+            android:text="RAM" />
     </LinearLayout>
 </LinearLayout>

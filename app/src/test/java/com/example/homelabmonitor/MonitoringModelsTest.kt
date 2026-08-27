@@ -2,10 +2,12 @@ package com.example.homelabmonitor
 
 import com.example.homelabmonitor.data.model.HealthState
 import com.example.homelabmonitor.data.model.HomelabSnapshot
+import com.example.homelabmonitor.data.model.SensorReading
 import com.example.homelabmonitor.data.model.formatBytes
 import com.example.homelabmonitor.data.model.formatDuration
 import com.example.homelabmonitor.data.model.healthState
 import com.example.homelabmonitor.data.model.ramUsagePercent
+import com.example.homelabmonitor.data.model.sensorGroups
 import com.example.homelabmonitor.data.model.usagePercent
 import com.example.homelabmonitor.data.repository.HttpMonitorRepository
 import com.example.homelabmonitor.data.repository.EndpointConfig
@@ -64,6 +66,27 @@ class MonitoringModelsTest {
         )
 
         assertEquals(HealthState.HEALTHY, snapshot.healthState())
+    }
+
+    @Test
+    fun groupsCoreTemperaturesAndKeepsTheirRange() {
+        val snapshot = HomelabSnapshot(
+            sensors = listOf(
+                SensorReading(name = "Core 0", value = 48.0),
+                SensorReading(name = "Core 1", value = 52.0),
+                SensorReading(name = "CPU Package", value = 55.0),
+                SensorReading(name = "nvme-pci-0100 temperature", value = 39.0),
+            ),
+        )
+
+        val groups = snapshot.sensorGroups()
+        val cores = groups.first { it.name == "CPU cores" }
+
+        assertEquals(3, groups.size)
+        assertEquals(2, cores.readingCount)
+        assertEquals(50.0, cores.value!!, 0.001)
+        assertEquals(48.0, cores.minimum!!, 0.001)
+        assertEquals(52.0, cores.maximum!!, 0.001)
     }
 
     @Test

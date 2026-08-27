@@ -2,31 +2,28 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:gravity="center_vertical"
+    android:padding="14dp"
     android:background="@drawable/widget_preview_background">
 
-    <TextView
-        style="@style/WidgetPreviewTitle"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Immich" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <View android:layout_width="8dp" android:layout_height="8dp" android:background="@drawable/widget_preview_dot_success" />
+        <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="Servidor" />
+        <TextView style="@style/WidgetPreviewCaption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="healthy" />
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="13dp"
+        android:layout_marginTop="10dp"
         android:orientation="horizontal"
         android:gravity="center_vertical">
         <View android:layout_width="8dp" android:layout_height="8dp" android:background="@drawable/widget_preview_dot_success" />
-        <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="Servidor   healthy" />
-    </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="9dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-        <View android:layout_width="8dp" android:layout_height="8dp" android:background="@drawable/widget_preview_dot_success" />
-        <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="Banco      healthy" />
+        <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="Banco" />
+        <TextView style="@style/WidgetPreviewCaption" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="healthy" />
     </LinearLayout>
 </LinearLayout>

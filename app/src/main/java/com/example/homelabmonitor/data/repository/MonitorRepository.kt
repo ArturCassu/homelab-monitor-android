@@ -2,7 +2,6 @@ package com.example.homelabmonitor.data.repository
 
 import com.example.homelabmonitor.data.model.AppSettings
 import com.example.homelabmonitor.data.model.HomelabSnapshot
-import com.example.homelabmonitor.data.model.MockSnapshotFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -13,11 +12,6 @@ import java.util.concurrent.TimeUnit
 
 interface MonitorRepository {
     suspend fun fetchSnapshot(): Result<HomelabSnapshot>
-}
-
-class MockMonitorRepository : MonitorRepository {
-    override suspend fun fetchSnapshot(): Result<HomelabSnapshot> =
-        Result.success(MockSnapshotFactory.create())
 }
 
 class ConfigurationErrorRepository(private val message: String) : MonitorRepository {

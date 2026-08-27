@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import com.example.homelabmonitor.data.model.AccentTheme
 import com.example.homelabmonitor.data.model.AppSettings
 import java.nio.ByteBuffer
 import java.security.KeyStore
@@ -22,11 +23,13 @@ class SecureSettingsStore(context: Context) {
 
     fun load(): AppSettings {
         val endpoint = decrypt(preferences.getString(KEY_ENDPOINT, null))
+        val token = decrypt(preferences.getString(KEY_TOKEN, null))
         return AppSettings(
             endpoint = endpoint,
-            token = decrypt(preferences.getString(KEY_TOKEN, null)),
-            useMockData = preferences.getBoolean(KEY_USE_MOCK, true),
-            setupComplete = preferences.getBoolean(KEY_SETUP_COMPLETE, endpoint.isNotBlank()),
+            token = token,
+            setupComplete = endpoint.isNotBlank() && token.isNotBlank() &&
+                preferences.getBoolean(KEY_SETUP_COMPLETE, true),
+            accentTheme = AccentTheme.fromKey(preferences.getString(KEY_ACCENT_THEME, AccentTheme.GRAPHITE.key)),
         )
     }
 
@@ -34,8 +37,9 @@ class SecureSettingsStore(context: Context) {
         preferences.edit()
             .putString(KEY_ENDPOINT, encrypt(settings.endpoint))
             .putString(KEY_TOKEN, encrypt(settings.token))
-            .putBoolean(KEY_USE_MOCK, settings.useMockData)
-            .putBoolean(KEY_SETUP_COMPLETE, settings.setupComplete)
+            .putBoolean(KEY_SETUP_COMPLETE, settings.setupComplete && settings.endpoint.isNotBlank() && settings.token.isNotBlank())
+            .putString(KEY_ACCENT_THEME, settings.accentTheme.key)
+            .remove(KEY_USE_MOCK)
             .apply()
     }
 
@@ -90,6 +94,7 @@ class SecureSettingsStore(context: Context) {
         const val KEY_TOKEN = "token_ciphertext"
         const val KEY_USE_MOCK = "use_mock_data"
         const val KEY_SETUP_COMPLETE = "setup_complete"
+        const val KEY_ACCENT_THEME = "accent_theme"
         const val KEY_ALIAS = "homelab_monitor_aes_v1"
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"

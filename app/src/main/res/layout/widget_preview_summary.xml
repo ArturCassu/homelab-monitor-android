@@ -2,17 +2,49 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="14dp"
     android:background="@drawable/widget_preview_background">
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            style="@style/WidgetPreviewTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="homelab" />
+        <TextView
+            style="@style/WidgetPreviewCaption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ONLINE"
+            android:textColor="@color/widget_preview_success"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+        <TextView style="@style/WidgetPreviewCaption" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="CPU" />
+        <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="18%" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal">
+        <TextView style="@style/WidgetPreviewCaption" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="RAM" />
+        <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="33%" />
+    </LinearLayout>
     <TextView
-        style="@style/WidgetPreviewTitle"
+        style="@style/WidgetPreviewCaption"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Geral · homelab" />
-
-    <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="11dp" android:text="Estado    Atenção" />
-    <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="CPU       18%" />
-    <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="RAM       5 GiB" />
-    <TextView style="@style/WidgetPreviewValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Docker    11 ativos" />
+        android:layout_marginTop="8dp"
+        android:text="Atualizado agora" />
 </LinearLayout>

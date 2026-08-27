@@ -50,6 +50,15 @@ data class SensorReading(
     val available: Boolean = true,
 )
 
+data class SensorGroup(
+    val name: String,
+    val value: Double?,
+    val minimum: Double?,
+    val maximum: Double?,
+    val unit: String,
+    val readingCount: Int,
+)
+
 @Serializable
 data class ContainerStatus(
     val running: Int = 0,
@@ -67,21 +76,33 @@ data class ContainerItem(
 
 @Serializable
 data class ImmichStatus(
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     val server: String = "unknown",
     val database: String = "unknown",
     val version: String? = null,
 )
 
+enum class AccentTheme(val key: String, val label: String) {
+    GRAPHITE("graphite", "Grafite"),
+    MINT("mint", "Menta"),
+    AMBER("amber", "Âmbar"),
+    VIOLET("violet", "Violeta"),
+    ;
+
+    companion object {
+        fun fromKey(key: String?): AccentTheme = entries.firstOrNull { it.key == key } ?: GRAPHITE
+    }
+}
+
 data class AppSettings(
     val endpoint: String = "",
     val token: String = "",
-    val useMockData: Boolean = true,
     val setupComplete: Boolean = false,
+    val accentTheme: AccentTheme = AccentTheme.GRAPHITE,
 )
 
 data class MonitorUiState(
-    val snapshot: HomelabSnapshot = MockSnapshotFactory.create(),
+    val snapshot: HomelabSnapshot = HomelabSnapshot(),
     val settings: AppSettings = AppSettings(),
     val isRefreshing: Boolean = false,
     val isConnecting: Boolean = false,
@@ -115,6 +136,39 @@ fun HomelabSnapshot.ramUsagePercent(): Float = percentage(memory.usedBytes, memo
 
 fun VolumeStatus.usagePercent(): Float = percentage(usedBytes, totalBytes)
 
+/**
+ * Turns noisy hwmon readings such as Core 0/Core 1 into one useful card. The
+ * raw readings remain available in the API; this is only a presentation model.
+ */
+fun HomelabSnapshot.sensorGroups(): List<SensorGroup> = sensors
+    .filter { it.name.isNotBlank() }
+    .groupBy { sensorGroupKey(it.name) }
+    .map { (name, readings) ->
+        val available = readings.filter { it.available && it.value != null }
+        val values = available.mapNotNull { it.value }
+        SensorGroup(
+            name = name,
+            value = values.averageOrNull(),
+            minimum = values.minOrNull(),
+            maximum = values.maxOrNull(),
+            unit = available.firstOrNull()?.unit ?: readings.firstOrNull()?.unit ?: "°C",
+            readingCount = readings.size,
+        )
+    }
+
+private fun sensorGroupKey(name: String): String {
+    val normalized = name.trim().replace(Regex("\\s+"), " ")
+    return when {
+        normalized.contains("gpu", ignoreCase = true) -> "GPU"
+        Regex(".*\\bcore\\s*#?\\d+\\b.*", RegexOption.IGNORE_CASE).matches(normalized) -> "CPU cores"
+        Regex(".*\\b(cpu\\s*)?(package|pkg|die)(\\s+id)?\\s*#?\\d*.*", RegexOption.IGNORE_CASE).matches(normalized) -> "CPU Package"
+        normalized.contains("nvme", ignoreCase = true) -> "NVMe"
+        else -> normalized.replace(Regex("\\s+(sensor|temp|temperature)?\\s*#?\\d+$", RegexOption.IGNORE_CASE), "").trim()
+            .ifBlank { normalized }
+    }
+
+private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
+
 private fun percentage(used: Long, total: Long): Float {
     if (total <= 0) return 0f
     return (used.toDouble() / total.toDouble()).coerceIn(0.0, 1.0).toFloat()
@@ -138,6 +192,10 @@ fun formatBytes(bytes: Long): String {
 
 fun formatPercent(value: Double): String = "%.0f%%".format(Locale.US, value.coerceIn(0.0, 100.0))
 
+fun formatTemperature(value: Double?, unit: String = "°C"): String = value?.let {
+    "%.1f %s".format(Locale.US, it, unit)
+} ?: "--"
+
 fun formatDuration(seconds: Long): String {
     if (seconds <= 0) return "--"
     val days = seconds / 86_400
@@ -154,29 +212,4 @@ fun formatObservedAt(epochMs: Long): String {
     if (epochMs <= 0) return "sem atualização"
     val formatter = DateTimeFormatter.ofPattern("dd/MM HH:mm", Locale.getDefault())
     return Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).format(formatter)
-}
-
-object MockSnapshotFactory {
-    fun create(nowEpochMs: Long = System.currentTimeMillis()): HomelabSnapshot = HomelabSnapshot(
-        host = "homelab (mock)",
-        online = true,
-        uptimeSeconds = 4 * 86_400L + 7 * 3_600L + 19 * 60L,
-        observedAtEpochMs = nowEpochMs,
-        cpu = CpuMetrics(usagePercent = 18.0, load1m = 0.42),
-        memory = MemoryMetrics(
-            usedBytes = 5_368_709_120L,
-            totalBytes = 16_106_127_360L,
-        ),
-        volumes = listOf(
-            VolumeStatus("/", usedBytes = 51_000_000_000L, freeBytes = 29_000_000_000L, totalBytes = 80_000_000_000L),
-            VolumeStatus("/srv/docker", usedBytes = 420_000_000_000L, freeBytes = 580_000_000_000L, totalBytes = 1_000_000_000_000L),
-            VolumeStatus("/srv/share", usedBytes = 1_250_000_000_000L, freeBytes = 750_000_000_000L, totalBytes = 2_000_000_000_000L),
-        ),
-        sensors = listOf(
-            SensorReading("CPU Package", 48.0),
-            SensorReading("NVMe", 39.0),
-        ),
-        containers = ContainerStatus(running = 11, stopped = 2, error = 1),
-        immich = ImmichStatus(enabled = true, server = "healthy", database = "healthy", version = "v1.132.0"),
-    )
 }

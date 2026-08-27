@@ -2,21 +2,26 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:gravity="center_vertical"
+    android:padding="14dp"
     android:background="@drawable/widget_preview_background">
 
-    <TextView
-        style="@style/WidgetPreviewTitle"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Armazenamento" />
-
-    <TextView
-        style="@style/WidgetPreviewValue"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="/   64% usado" />
+        android:orientation="horizontal">
+        <TextView
+            style="@style/WidgetPreviewCaption"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="/" />
+        <TextView
+            style="@style/WidgetPreviewValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="64%" />
+    </LinearLayout>
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="7dp"
@@ -28,12 +33,23 @@
             android:background="@drawable/widget_preview_primary" />
     </FrameLayout>
 
-    <TextView
-        style="@style/WidgetPreviewValue"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="/srv/docker   42% usado" />
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+        <TextView
+            style="@style/WidgetPreviewCaption"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="/srv/docker" />
+        <TextView
+            style="@style/WidgetPreviewValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="42%" />
+    </LinearLayout>
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="7dp"

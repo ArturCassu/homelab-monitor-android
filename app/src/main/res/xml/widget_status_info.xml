@@ -7,6 +7,5 @@
     android:maxResizeHeight="180dp"
     android:resizeMode="horizontal|vertical"
     android:previewLayout="@layout/widget_preview_status"
-    android:previewImage="@drawable/widget_preview_fallback"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

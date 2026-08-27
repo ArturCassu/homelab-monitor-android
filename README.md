@@ -32,7 +32,7 @@ no terminal do homelab; ela não é passada ao script nem armazenada.
 ### No celular Android
 
 1. Instale e conecte o [Tailscale no Android](https://play.google.com/store/apps/details?id=com.tailscale.ipn).
-2. Baixe o [APK de teste mais recente](https://github.com/ArturCassu/homelab-monitor-android/releases/download/v0.4.1/HomelabMonitor-debug.apk).
+2. Baixe o [APK de teste mais recente](https://github.com/ArturCassu/homelab-monitor-android/releases/download/v0.5.0/HomelabMonitor-debug.apk).
 3. Se o Android pedir, permita temporariamente a instalação pelo navegador ou
    gerenciador de arquivos.
 4. Abra o Homelab Monitor e informe `homelab`, `http://homelab` ou uma URL com
@@ -44,7 +44,7 @@ no terminal do homelab; ela não é passada ao script nem armazenada.
    ```
 
    Não publique esse valor em issues, chats ou commits.
-6. Toque em **Testar e entrar**. O app só salva a configuração depois de uma
+6. Toque em **Conectar ao homelab**. O app só salva a configuração depois de uma
    resposta válida da API.
 
 O host e o token são protegidos por uma chave do Android Keystore. Para trocar
@@ -104,9 +104,9 @@ separadamente. Para redimensionar, mantenha o widget pressionado e arraste as
 alças; o conteúdo muda entre uma versão compacta e uma expandida para evitar
 texto cortado.
 
-Os previews do seletor do Android usam o mesmo desenho dos widgets reais. Os
-indicadores são desenhados pelo app, sem emojis e sem depender da fonte do
-celular.
+Os previews do seletor do Android usam o mesmo sistema visual dos widgets reais,
+com layouts estáveis para o launcher. Os indicadores são desenhados pelo app,
+sem emojis e sem depender da fonte do celular.
 
 ## Atualizações do APK
 
@@ -207,7 +207,7 @@ limite mínimo de 15 minutos do Android.
 - `app/src/main/java/com/example/homelabmonitor/widget/HomelabWidgets.kt`:
   sete providers Glance responsivos;
 - `app/src/main/java/com/example/homelabmonitor/data/repository`: validação,
-  armazenamento seguro e repositório substituível por API/mock;
+  armazenamento seguro e cliente HTTP somente leitura;
 - `app/src/main/java/com/example/homelabmonitor/worker`: sincronização com
   WorkManager;
 - `server-agent/homelab-monitor`: CLI interativa;
@@ -215,5 +215,6 @@ limite mínimo de 15 minutos do Android.
 - `server-agent/homelab_metrics.py`: API Python sem dependências externas;
 - `update/latest.json`: metadados usados pelo atualizador do APK.
 
-O app continua funcionando com dados mockados quando o usuário escolhe o modo
-demonstração; o modo real exige host válido e token válido.
+Não há modo demonstração: o app só entra no painel depois de validar um host e
+um token contra um homelab real. A configuração antiga de demonstração é
+descartada na migração para evitar que dados fictícios reapareçam nos widgets.
