@@ -166,6 +166,7 @@ private fun sensorGroupKey(name: String): String {
         else -> normalized.replace(Regex("\\s+(sensor|temp|temperature)?\\s*#?\\d+$", RegexOption.IGNORE_CASE), "").trim()
             .ifBlank { normalized }
     }
+}
 
 private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
 

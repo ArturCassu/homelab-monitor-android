@@ -1,6 +1,7 @@
 package com.example.homelabmonitor.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -579,6 +580,7 @@ private fun SecurityCard() {
 private fun MetricRing(label: String, progress: Float) {
     val normalized = progress.coerceIn(0f, 1f)
     val accent = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.surfaceVariant
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier.size(112.dp),
@@ -587,7 +589,7 @@ private fun MetricRing(label: String, progress: Float) {
             Canvas(Modifier.fillMaxSize()) {
                 val stroke = 14.dp.toPx()
                 drawArc(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = track,
                     startAngle = -90f,
                     sweepAngle = 360f,
                     useCenter = false,
