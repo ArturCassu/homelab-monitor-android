@@ -18,4 +18,4 @@ if [ ! -r /dev/tty ]; then
     exit 1
 fi
 
-exec "$TEMP_DIR/server-agent/homelab-monitor" install "$@" </dev/tty
+exec sh "$TEMP_DIR/server-agent/homelab-monitor" install "$@" </dev/tty
