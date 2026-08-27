@@ -118,7 +118,10 @@ Play Store, mas o arquivo temporário é reutilizado/removido e não se acumula 
 
 Também é possível usar a página de [releases do GitHub](https://github.com/ArturCassu/homelab-monitor-android/releases).
 Para atualizar sobre a versão instalada, a assinatura do APK precisa ser a
-mesma; a release de teste do projeto mantém a assinatura de desenvolvimento.
+mesma. Como a 0.4.1 e esta 0.5.0 foram geradas por ambientes de build
+descartáveis diferentes, esta atualização pode exigir uma instalação limpa uma
+vez; depois disso, futuras versões precisam manter uma chave de assinatura
+persistente.
 
 ## Build local
 
