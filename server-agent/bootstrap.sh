@@ -11,4 +11,11 @@ command -v tar >/dev/null 2>&1 || { echo "tar é necessário para o bootstrap." 
 echo "Baixando o Homelab Monitor de $REPOSITORY..."
 curl --fail --silent --show-error --location "$REPOSITORY/archive/refs/heads/main.tar.gz" \
     | tar -xzf - -C "$TEMP_DIR" --strip-components=1
-exec "$TEMP_DIR/server-agent/homelab-monitor" install "$@"
+
+if [ ! -r /dev/tty ]; then
+    echo "Este instalador é interativo e precisa de um terminal." >&2
+    echo "Execute-o diretamente em uma sessão SSH/Tailscale com TTY." >&2
+    exit 1
+fi
+
+exec "$TEMP_DIR/server-agent/homelab-monitor" install "$@" </dev/tty
